@@ -56,4 +56,4 @@ if __name__ == "__main__":
         text_select=False,
     )
 
-    webview.start(debug=True)
+    webview.start(debug=False)

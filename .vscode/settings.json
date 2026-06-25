@@ -1,3 +1,4 @@
 {
-    "totvsLanguageServer.welcomePage": false
+    "totvsLanguageServer.welcomePage": false,
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }
