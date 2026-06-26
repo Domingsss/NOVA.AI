@@ -1,59 +1,72 @@
+# src/main.py
 import os
 import sys
-import pathlib
+import traceback
 import webview
+
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(SRC_DIR)
+
+from api import API
 from database import inicializar
 from rotinas import iniciar_rotinas
-from api import API
 
-# ─── ENCONTRAR A PASTA "ui" AUTOMATICAMENTE ──────────────────────────────────
 
-if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def main():
+    print("[NOVA] Iniciando...")
 
-CANDIDATOS = [
-    os.path.join(BASE_DIR, "ui", "index.html"),
-    os.path.join(BASE_DIR, "..", "ui", "index.html"),
-    os.path.join(BASE_DIR, "..", "..", "ui", "index.html"),
-]
+    # Banco de dados
+    try:
+        inicializar()
+        print("[NOVA] Banco OK")
+    except Exception as e:
+        print(f"[NOVA] Aviso no banco: {e}")
+        traceback.print_exc()
 
-HTML_FILE = None
-for caminho in CANDIDATOS:
-    caminho_abs = os.path.abspath(caminho)
-    if os.path.exists(caminho_abs):
-        HTML_FILE = caminho_abs
-        break
-
-if HTML_FILE is None:
-    print("\n❌ Não encontrei a pasta 'ui' com o index.html em nenhum desses locais:")
-    for c in CANDIDATOS:
-        print(f"   - {os.path.abspath(c)}")
-    print(f"\nBASE_DIR atual: {BASE_DIR}")
-    sys.exit(1)
-
-# Converte para uma URI file:// correta, lidando com espaços e caracteres especiais
-HTML_URI = pathlib.Path(HTML_FILE).resolve().as_uri()
-print(f"✓ Carregando: {HTML_URI}")
-
-# ─── MAIN ─────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    inicializar()
-    iniciar_rotinas()
+    # Rotinas em background (monitor de lembretes, etc.)
+    try:
+        iniciar_rotinas()
+        print("[NOVA] Rotinas OK")
+    except Exception as e:
+        print(f"[NOVA] Aviso nas rotinas: {e}")
+        traceback.print_exc()
 
     api = API()
+    print("[NOVA] API OK")
 
-    window = webview.create_window(
+    # Caminho absoluto do index.html (está em src/ui/index.html)
+    caminho_html = os.path.join(SRC_DIR, 'ui', 'index.html')
+    print(f"[NOVA] HTML: {caminho_html}")
+    print(f"[NOVA] Arquivo existe: {os.path.exists(caminho_html)}")
+
+    # Cria a janela do pywebview
+    webview.create_window(
         title="NOVA — Assistente Pessoal",
-        url=HTML_URI,
-        js_api=api,
-        width=1200,
-        height=750,
-        min_size=(800, 550),
-        background_color="#0a0a0f",
-        text_select=False,
+        url=caminho_html,
+        js_api=api,       # Liga o JS no Python
+        width=1100,
+        height=700,
+        min_size=(800, 500),
+        text_select=False
     )
 
-    webview.start(debug=False)
+    print("[NOVA] Abrindo janela...")
+    webview.start(debug=False)  # Mude debug para False quando for distribuir
+    print("[NOVA] Janela fechada. Fim.")
+
+
+if __name__ == "__main__":
+    # Garante que as pastas de dados existem
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.makedirs(os.path.join(base_dir, 'data'), exist_ok=True)
+    os.makedirs(os.path.join(base_dir, 'assets', 'imagens_editadas'), exist_ok=True)
+
+    try:
+        main()
+    except Exception:
+        print("\n" + "=" * 60)
+        print("ERRO FATAL NA NOVA:")
+        print("=" * 60)
+        traceback.print_exc()
+        print("=" * 60)
+        input("\nPressione Enter para fechar...")

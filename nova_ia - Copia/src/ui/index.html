@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NOVA</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ SIDEBAR -->
+<aside id="sidebar">
+  <div id="sidebar-logo">
+    <span class="logo-text">NOVA</span>
+    <span class="logo-dot">●</span>
+  </div>
+
+  <nav id="nav">
+    <button class="nav-btn active" data-aba="chat">💬 Chat</button>
+    <button class="nav-btn" data-aba="tarefas">✅ Tarefas</button>
+    <button class="nav-btn" data-aba="lembretes">⏰ Lembretes</button>
+    <button class="nav-btn" data-aba="foco">🎯 Foco</button>
+    <button class="nav-btn" data-aba="habitos">📊 Hábitos</button>
+    <button class="nav-btn" data-aba="imagens">🖼 Imagens</button>
+  </nav>
+
+  <div class="sidebar-section-label">CONVERSAS</div>
+  <button id="btn-nova-conversa">+ Nova conversa</button>
+  <div id="lista-sessoes"></div>
+
+  <div id="sidebar-footer">
+    <button class="footer-btn" onclick="abrirModalKey()">⚙ API Key</button>
+  </div>
+</aside>
+
+<div id="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════ CONTEÚDO -->
+<main id="conteudo">
+
+  <!-- ── CHAT ── -->
+  <section id="aba-chat" class="aba active">
+    <div id="chat-msgs"></div>
+    <div id="chat-input-area">
+  <label id="btn-anexar" title="Anexar imagem">
+    📎
+    <input type="file" id="chat-imagem" accept="image/*" style="display:none" onchange="previewImagem(event)"/>
+  </label>
+  <div id="chat-preview-wrap" style="display:none">
+    <img id="chat-preview-img" src="" alt=""/>
+    <button onclick="removerImagem()">✕</button>
+  </div>
+  <textarea id="chat-input" placeholder="Fale com a NOVA..." rows="2"></textarea>
+  <button id="chat-send">▲</button>
+</div>
+    </div>
+  </section>
+
+  <!-- ── TAREFAS ── -->
+  <section id="aba-tarefas" class="aba">
+    <div class="painel-header">
+      <h2>✅ Tarefas</h2>
+      <button class="btn-primary" onclick="abrirModalTarefa()">+ Nova tarefa</button>
+    </div>
+    <div id="lista-tarefas"></div>
+  </section>
+
+  <!-- ── LEMBRETES ── -->
+  <section id="aba-lembretes" class="aba">
+    <div class="painel-header">
+      <h2>⏰ Lembretes</h2>
+      <button class="btn-primary" onclick="abrirModalLembrete()">+ Novo lembrete</button>
+    </div>
+    <div id="lista-lembretes"></div>
+  </section>
+
+  <!-- ── FOCO ── -->
+  <section id="aba-foco" class="aba">
+    <div class="painel-header"><h2>🎯 Modo Foco</h2></div>
+    <div id="foco-centro">
+      <div id="foco-fase">FOCO</div>
+      <div id="foco-timer">25:00</div>
+      <div id="foco-stats"></div>
+      <div id="foco-config">
+        <label>Foco (min) <input id="foco-min" type="number" value="25" min="1" max="120"/></label>
+        <label>Pausa (min) <input id="pausa-min" type="number" value="5" min="1" max="60"/></label>
+      </div>
+      <div id="foco-btns">
+        <button id="btn-foco-iniciar" class="btn-primary" onclick="focoIniciar()">▶ Iniciar</button>
+        <button id="btn-foco-pausar" class="btn-secondary" onclick="focoPausar()" disabled>⏸ Pausar</button>
+        <button id="btn-foco-cancelar" class="btn-danger" onclick="focoCancelar()" disabled>✕ Cancelar</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HÁBITOS ── -->
+  <section id="aba-habitos" class="aba">
+    <div class="painel-header">
+      <h2>📊 Hábitos</h2>
+      <button class="btn-primary" onclick="abrirModalHabito()">+ Novo hábito</button>
+    </div>
+    <div id="lista-habitos"></div>
+  </section>
+
+  <!-- ── IMAGENS ── -->
+  <section id="aba-imagens" class="aba">
+    <div class="painel-header">
+      <h2>🖼 Imagens</h2>
+      <button class="btn-secondary" onclick="chamarAPI('abrir_pasta_editadas')">📂 Ver editadas</button>
+    </div>
+    <div id="imagens-corpo">
+      <div id="imagens-preview-area">
+        <button class="btn-primary" onclick="selecionarImagem()">📁 Selecionar imagem</button>
+        <div id="imagens-preview-wrap">
+          <img id="imagens-preview" src="" alt="" style="display:none"/>
+          <p id="imagens-placeholder">Nenhuma imagem selecionada</p>
+        </div>
+        <p id="imagens-info"></p>
+        <p id="imagens-status"></p>
+      </div>
+
+      <div id="imagens-controles">
+
+        <div class="ctrl-secao">✂️ Remover fundo</div>
+        <button class="btn-primary" onclick="processarImagem('remover_fundo')">Remover fundo</button>
+
+        <div class="ctrl-secao">🎨 Trocar fundo por cor</div>
+        <div class="ctrl-linha">
+          <input type="color" id="cor-fundo" value="#ffffff"/>
+          <span id="cor-fundo-label">#ffffff</span>
+        </div>
+        <button class="btn-primary" onclick="processarImagem('trocar_fundo')">Aplicar cor</button>
+
+        <div class="ctrl-secao">✨ Melhorar qualidade</div>
+        <div class="slider-wrap"><label>Nitidez <span id="val-nitidez">2.0</span></label>
+          <input type="range" id="sl-nitidez" min="1" max="4" step="0.1" value="2"
+                 oninput="document.getElementById('val-nitidez').textContent=this.value"/></div>
+        <div class="slider-wrap"><label>Brilho <span id="val-brilho">1.1</span></label>
+          <input type="range" id="sl-brilho" min="0.5" max="2" step="0.1" value="1.1"
+                 oninput="document.getElementById('val-brilho').textContent=this.value"/></div>
+        <div class="slider-wrap"><label>Contraste <span id="val-contraste">1.2</span></label>
+          <input type="range" id="sl-contraste" min="0.5" max="2" step="0.1" value="1.2"
+                 oninput="document.getElementById('val-contraste').textContent=this.value"/></div>
+        <div class="slider-wrap"><label>Saturação <span id="val-cor">1.1</span></label>
+          <input type="range" id="sl-cor" min="0.5" max="2" step="0.1" value="1.1"
+                 oninput="document.getElementById('val-cor').textContent=this.value"/></div>
+        <button class="btn-primary" onclick="processarImagem('melhorar')">Melhorar</button>
+
+        <div class="ctrl-secao">🔍 Aumentar resolução</div>
+        <div class="ctrl-linha">
+          <label><input type="radio" name="escala" value="2" checked/> 2x</label>
+          <label><input type="radio" name="escala" value="3"/> 3x</label>
+          <label><input type="radio" name="escala" value="4"/> 4x</label>
+        </div>
+        <button class="btn-primary" onclick="processarImagem('aumentar')">Aumentar</button>
+
+        <div class="ctrl-secao">📱 Otimizar Instagram</div>
+        <select id="formato-instagram">
+          <option>Feed quadrado (1:1)</option>
+          <option>Feed retrato (4:5)</option>
+          <option>Feed paisagem (1.91:1)</option>
+          <option>Stories (9:16)</option>
+          <option>Reels (9:16)</option>
+        </select>
+        <button class="btn-primary" onclick="processarImagem('instagram')">Otimizar</button>
+
+        <div id="imagens-instrucao-wrap">
+          <textarea id="imagens-instrucao" placeholder="Descreva como quer editar a foto... ex: 'remove o fundo', 'deixa mais nítida', 'otimiza pro feed do Instagram'" rows="2"></textarea>
+          <button class="btn-primary" onclick="aplicarEdicaoTexto()">✨ Aplicar edição</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════ MODAIS -->
+
+<!-- Modal API Key -->
+<div id="modal-key" class="modal" style="display:none">
+  <div class="modal-box">
+    <h3>⚙ API Key</h3>
+    <p class="modal-sub">console.groq.com → API Keys → Create</p>
+    <input type="password" id="input-key" placeholder="Cole sua Groq API key..."/>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="fecharModal('modal-key')">Cancelar</button>
+      <button class="btn-primary" onclick="salvarKey()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nova Tarefa -->
+<div id="modal-tarefa" class="modal" style="display:none">
+  <div class="modal-box">
+    <h3>✅ Nova Tarefa</h3>
+    <input type="text" id="tarefa-titulo" placeholder="Título"/>
+    <input type="text" id="tarefa-desc" placeholder="Descrição (opcional)"/>
+    <input type="date" id="tarefa-prazo"/>
+    <div class="radio-group">
+      <label><input type="radio" name="prio" value="alta"/> 🔴 Alta</label>
+      <label><input type="radio" name="prio" value="media" checked/> 🟡 Média</label>
+      <label><input type="radio" name="prio" value="baixa"/> 🟢 Baixa</label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="fecharModal('modal-tarefa')">Cancelar</button>
+      <button class="btn-primary" onclick="criarTarefa()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Novo Lembrete -->
+<div id="modal-lembrete" class="modal" style="display:none">
+  <div class="modal-box">
+    <h3>⏰ Novo Lembrete</h3>
+    <input type="text" id="lembrete-titulo" placeholder="Título"/>
+    <input type="datetime-local" id="lembrete-data"/>
+    <div class="radio-group">
+      <label><input type="radio" name="rep" value="nunca" checked/> Nunca</label>
+      <label><input type="radio" name="rep" value="diario"/> Diário</label>
+      <label><input type="radio" name="rep" value="semanal"/> Semanal</label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="fecharModal('modal-lembrete')">Cancelar</button>
+      <button class="btn-primary" onclick="criarLembrete()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Novo Hábito -->
+<div id="modal-habito" class="modal" style="display:none">
+  <div class="modal-box">
+    <h3>📊 Novo Hábito</h3>
+    <input type="text" id="habito-nome" placeholder="Nome do hábito"/>
+    <div class="ctrl-linha">
+      <input type="text" id="habito-icone" placeholder="Ícone" value="⭐" style="width:60px"/>
+      <input type="color" id="habito-cor" value="#7c6fff"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="fecharModal('modal-habito')">Cancelar</button>
+      <button class="btn-primary" onclick="criarHabito()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -23,11 +23,8 @@ async function chamarAPI(fn, ...args) {
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 window.addEventListener("pywebviewready", async () => {
-  await novaConversa()
-  await carregarSessoes()
-  await carregarResumoMatinal()
-  await atualizarStatsFoco()
-
+  // Anexa TODOS os event listeners primeiro (síncrono). Assim a UI fica
+  // clicável imediatamente, mesmo que o carregamento assíncrono falhe.
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => trocarAba(btn.dataset.aba))
   })
@@ -46,6 +43,11 @@ window.addEventListener("pywebviewready", async () => {
   document.getElementById("cor-fundo").addEventListener("input", e => {
     document.getElementById("cor-fundo-label").textContent = e.target.value
   })
+
+  // Agora sim: carrega os dados (best-effort, não trava a UI se falhar)
+  try { await abrirUltimaConversa() } catch (e) { console.error("abrirUltimaConversa:", e) }
+  try { await carregarResumoMatinal() } catch (e) { console.error("carregarResumoMatinal:", e) }
+  try { await atualizarStatsFoco() } catch (e) { console.error("atualizarStatsFoco:", e) }
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -67,6 +69,28 @@ function trocarAba(aba) {
 // ══════════════════════════════════════════════════════════════════════════════
 // CHAT
 // ══════════════════════════════════════════════════════════════════════════════
+
+// Ao abrir o app, continua a conversa mais recente em vez de criar uma nova
+// em branco. Só cria uma nova se não houver nenhuma ainda.
+async function abrirUltimaConversa() {
+  const res = await chamarAPI("get_sessoes")
+  if (!res.ok || !res.data || res.data.length === 0) {
+    await novaConversa()
+    return
+  }
+  const ultima = res.data[0]  // listar_sessoes já vem ordenado por criado_em DESC
+  sessaoAtual = ultima.id
+  await carregarSessoes()
+  marcarSessaoAtiva(sessaoAtual)
+  // Carrega o histórico direto — não chama abrirSessao/trocarAba porque a aba
+  // chat já é a ativa por padrão no HTML.
+  const hist = await chamarAPI("get_historico", ultima.id)
+  if (hist.ok) {
+    const msgs = document.getElementById("chat-msgs")
+    msgs.innerHTML = ""
+    hist.data.forEach(m => adicionarMensagem(m.role === "user" ? "user" : "nova", m.content))
+  }
+}
 
 async function novaConversa() {
   const res = await chamarAPI("nova_sessao")

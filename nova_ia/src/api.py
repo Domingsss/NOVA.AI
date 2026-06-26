@@ -112,12 +112,51 @@ class API:
             historico.append({"role": "user", "content": conteudo})
             salvar_mensagem(sessao_id, "user", mensagem or "[imagem]")
 
-            resposta = chamar_groq(api_key, historico)
+            try:
+                resposta = chamar_groq(api_key, historico)
+            except Exception as e:
+                # Erro da API: NÃO salva uma "resposta" de erro no banco,
+                # pois poluiria o histórico e confundiria a IA nas próximas
+                # mensagens. A mensagem do usuário já foi salva e é válida
+                # como contexto.
+                return self._erro(f"Falha ao contatar a IA: {e}")
             salvar_mensagem(sessao_id, "assistant", resposta)
+
+            # Renomeia a sessão se ainda tiver o título padrão (só na 1ª troca)
+            self._tentar_renomear_sessao(sessao_id, mensagem or "Imagem enviada")
 
             return self._ok({"tipo": "texto", "resposta": resposta})
         except Exception as e:
             return self._erro(e)
+
+    def _tentar_renomear_sessao(self, sessao_id: int, primeira_msg: str):
+        """Gera um título curto para a sessão se ela ainda tiver o nome padrão.
+
+        Roda de forma best-effort: se falhar (rede, quota, etc), a sessão
+        simplesmente continua com o nome padrão — não derruba o chat.
+        """
+        try:
+            sessoes = listar_sessoes()
+            sessao = next((s for s in sessoes if s["id"] == sessao_id), None)
+            if not sessao:
+                return
+            if sessao["titulo"] != "Nova conversa":
+                return  # já tem nome customizado, não mexe
+
+            system = (
+                "Gere um título MUITO curto (máximo 5 palavras) que resuma o tema "
+                "da mensagem do usuário. Sem aspas, sem pontuação final, sem "
+                "prefixos como 'Título:'. Responda APENAS com o título."
+            )
+            titulo = chamar_groq_simples(system, primeira_msg[:500]).strip()
+            # Limpa aspas e eventuais aspas envolvendo o título
+            titulo = titulo.strip("\"'").strip()
+            if len(titulo) > 60:
+                titulo = titulo[:57] + "..."
+            if titulo:
+                renomear_sessao(sessao_id, titulo)
+        except Exception:
+            pass  # best-effort: não deixa o rename quebrar o chat
 
     def chat_imagem(self, sessao_id: int, mensagem: str, imagem_b64: str):
         """
