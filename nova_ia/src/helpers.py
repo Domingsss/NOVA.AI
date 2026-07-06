@@ -35,6 +35,30 @@ def chamar_groq(api_key: str, historico: list) -> str:
     return response.choices[0].message.content
 
 
+def chamar_groq_stream(api_key: str, historico: list):
+    """Chama o Groq com streaming. Gera (yield) cada pedaço de texto conforme
+    chega da API, em vez de esperar a resposta completa.
+
+    Levanta exceção em caso de erro — NÃO retorna string de erro.
+    """
+    if not api_key:
+        raise RuntimeError("API key não configurada.")
+    client = Groq(api_key=api_key)
+    stream = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=1024,
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + historico,
+        stream=True
+    )
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        texto = getattr(delta, "content", None)
+        if texto:
+            yield texto
+
+
 def chamar_groq_simples(system_prompt: str, mensagem: str) -> str:
     """Chamada simples ao Groq sem histórico, usada para classificação/interpretação.
 

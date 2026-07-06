@@ -4,7 +4,7 @@ import json
 import time
 import base64
 import datetime
-from helpers import carregar_key, salvar_key, chamar_groq, chamar_groq_simples
+from helpers import carregar_key, salvar_key, chamar_groq, chamar_groq_simples, chamar_groq_stream
 from database import (
     criar_sessao, listar_sessoes, renomear_sessao, deletar_sessao,
     salvar_mensagem, carregar_historico, limpar_historico,
@@ -112,6 +112,15 @@ class API:
             historico.append({"role": "user", "content": conteudo})
             salvar_mensagem(sessao_id, "user", mensagem or "[imagem]")
 
+            # NOVA agente: tenta executar uma ação (criar tarefa/lembrete, etc)
+            # antes de responder. Se executou, adiciona contexto pro modelo.
+            try:
+                ctx_agente = self._tentar_acao_agente(sessao_id, mensagem or "")
+                if ctx_agente:
+                    historico.append({"role": "system", "content": ctx_agente})
+            except Exception:
+                pass  # best-effort: não deixa o agente quebrar o chat
+
             try:
                 resposta = chamar_groq(api_key, historico)
             except Exception as e:
@@ -120,6 +129,7 @@ class API:
                 # mensagens. A mensagem do usuário já foi salva e é válida
                 # como contexto.
                 return self._erro(f"Falha ao contatar a IA: {e}")
+
             salvar_mensagem(sessao_id, "assistant", resposta)
 
             # Renomeia a sessão se ainda tiver o título padrão (só na 1ª troca)
@@ -128,6 +138,159 @@ class API:
             return self._ok({"tipo": "texto", "resposta": resposta})
         except Exception as e:
             return self._erro(e)
+
+    def enviar_mensagem_stream(self, sessao_id: int, mensagem: str):
+        """Envia mensagem e faz streaming da resposta, chunk por chunk.
+
+        Cada chunk é injetado no frontend via `window.__novaChunk(texto)`.
+        Ao final, chama `window.__novaFim()`. Em caso de erro durante o
+        streaming, chama `window.__novaErro(msg)`.
+
+        A resposta completa é salva no banco ao final (só se deu certo).
+        """
+        try:
+            import webview
+            janela = webview.windows[0] if webview.windows else None
+
+            def emit(js):
+                if janela:
+                    try:
+                        janela.evaluate_js(js)
+                    except Exception:
+                        pass
+
+            api_key = carregar_key()
+            if not api_key:
+                emit("window.__novaErro && window.__novaErro('API key não configurada.')")
+                return self._erro("API key não configurada.")
+
+            historico = carregar_historico(sessao_id)
+            historico.append({"role": "user", "content": mensagem})
+            salvar_mensagem(sessao_id, "user", mensagem)
+
+            # NOVA agente: tenta executar uma ação (criar tarefa/lembrete, etc)
+            # antes de responder. Se executou, adiciona contexto pro modelo.
+            # IMPORTANTE: a ação roda ANTES do streaming começar, pra que a
+            # confirmação já venha no stream.
+            try:
+                ctx_agente = self._tentar_acao_agente(sessao_id, mensagem)
+                if ctx_agente:
+                    historico.append({"role": "system", "content": ctx_agente})
+            except Exception:
+                pass  # best-effort: não deixa o agente quebrar o chat
+
+            resposta_completa = ""
+            try:
+                for chunk in chamar_groq_stream(api_key, historico):
+                    resposta_completa += chunk
+                    emit(f"window.__novaChunk && window.__novaChunk({json.dumps(chunk)});")
+            except Exception as e:
+                emit(f"window.__novaErro && window.__novaErro({json.dumps(str(e))});")
+                # Não salva resposta parcial no banco — poluiria o histórico
+                return self._erro(f"Falha ao contatar a IA: {e}")
+
+            salvar_mensagem(sessao_id, "assistant", resposta_completa)
+            self._tentar_renomear_sessao(sessao_id, mensagem)
+
+            emit("window.__novaFim && window.__novaFim();")
+            return self._ok({"resposta": resposta_completa})
+        except Exception as e:
+            return self._erro(e)
+
+    def _tentar_acao_agente(self, sessao_id: int, mensagem: str):
+        """Detecta se a mensagem é um pedido de ação (criar tarefa/lembrete,
+        listar tarefas, etc). Se for, executa e retorna um texto de confirmação
+        pra NOVA incluir na resposta.
+
+        Roda de forma best-effort: se falhar (rede, IA não retornar JSON, etc),
+        retorna None e o fluxo continua normalmente (só conversa).
+        """
+        try:
+            import datetime as _dt
+
+            hoje = _dt.date.today().strftime("%Y-%m-%d")
+
+            system = f"""Você é um classificador de intenções. Analise a mensagem do usuário e decida se é um pedido para executar uma AÇÃO no sistema.
+
+Data de hoje: {hoje}
+
+Ações disponíveis:
+- criar_tarefa: criar uma tarefa nova. params: {{"titulo": "...", "prioridade": "alta|media|baixa", "prazo": "YYYY-MM-DD ou null"}}
+  - "titulo": obrigatório, curto e descritivo
+  - "prioridade": opcional (padrão "media")
+  - "prazo": opcional (formato YYYY-MM-DD, ou null se não mencionado). Interprete "hoje", "amanhã", "próxima semana", etc.
+- criar_lembrete: criar um lembrete. params: {{"titulo": "...", "data_hora": "YYYY-MM-DDTHH:MM", "repetir": "nunca|diario|semanal"}}
+  - "titulo": obrigatório
+  - "data_hora": obrigatório (formato YYYY-MM-DDTHH:MM). Se não veio hora, use 09:00.
+  - "repetir": opcional (padrão "nunca")
+- listar_tarefas: listar tarefas pendentes. params: {{}}
+- nenhuma: a mensagem NÃO é um pedido de ação (é conversa, pergunta, etc).
+
+Regras:
+- Só classifique como ação se a intenção do usuário for CLARAMENTE executar a ação.
+- "me lembra de X amanhã" → criar_lembrete
+- "cria uma tarefa de X" / "anota aí: X" / "preciso fazer X até Y" → criar_tarefa
+- "quais são minhas tarefas?" / "o que tenho pendente?" → listar_tarefas
+- "o que é X?" / "me explica Y" / "oi" → nenhuma
+
+Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
+{{"acao": "...", "params": {{...}}}}"""
+
+            resposta = chamar_groq_simples(system, mensagem)
+            texto = resposta.strip()
+            if texto.startswith("```"):
+                texto = texto.strip("`")
+                if texto.lower().startswith("json"):
+                    texto = texto[4:]
+            texto = texto.strip()
+
+            escolha = json.loads(texto)
+            acao = escolha.get("acao", "nenhuma")
+            params = escolha.get("params", {})
+
+            if acao == "nenhuma" or not acao:
+                return None
+
+            # ── Executa a ação ──
+            if acao == "criar_tarefa":
+                titulo = params.get("titulo", "").strip()
+                if not titulo:
+                    return None
+                prioridade = params.get("prioridade", "media")
+                if prioridade not in ("alta", "media", "baixa"):
+                    prioridade = "media"
+                prazo = params.get("prazo")
+                if prazo == "null":
+                    prazo = None
+                tid = criar_tarefa(titulo, "", None, prioridade, prazo)
+                prazo_txt = f" (prazo: {prazo})" if prazo else ""
+                return f"[SISTEMA — Ação executada automaticamente: criei a tarefa #{tid} '{titulo}' com prioridade {prioridade}{prazo_txt}. Confirme ao usuário de forma natural, mencionando a tarefa.]"
+
+            if acao == "criar_lembrete":
+                titulo = params.get("titulo", "").strip()
+                data_hora = params.get("data_hora", "").strip()
+                if not titulo or not data_hora:
+                    return None
+                repetir = params.get("repetir", "nunca")
+                if repetir not in ("nunca", "diario", "semanal"):
+                    repetir = "nunca"
+                lid = criar_lembrete(titulo, data_hora, "", repetir)
+                rep_txt = f", repete {repetir}" if repetir != "nunca" else ""
+                return f"[SISTEMA — Ação executada automaticamente: criei o lembrete #{lid} '{titulo}' para {data_hora}{rep_txt}. Confirme ao usuário de forma natural, mencionando o lembrete.]"
+
+            if acao == "listar_tarefas":
+                tarefas = listar_tarefas(status="pendente")
+                if not tarefas:
+                    return "[SISTEMA — Ação executada: o usuário pediu suas tarefas pendentes. Não há nenhuma. Avise.]"
+                lista = "; ".join(f"{t['titulo']} ({t['prioridade']})" for t in tarefas[:10])
+                return f"[SISTEMA — Ação executada: o usuário pediu suas tarefas pendentes. Encontrei {len(tarefas)}: {lista}. Apresente ao usuário de forma organizada.]"
+
+            return None
+
+        except json.JSONDecodeError:
+            return None
+        except Exception:
+            return None
 
     def _tentar_renomear_sessao(self, sessao_id: int, primeira_msg: str):
         """Gera um título curto para a sessão se ela ainda tiver o nome padrão.

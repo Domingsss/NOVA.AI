@@ -255,32 +255,88 @@ async function enviarMensagem() {
 
   const btn = document.getElementById("chat-send")
   btn.disabled = true
-  const pensando = adicionarMensagem(
-    "muted",
-    imagemEnviada ? "NOVA está olhando a imagem..." : "NOVA está pensando..."
-  )
 
-  let res
+  // ── Fluxo com imagem: sem streaming (a resposta é curta/édita imagem) ──
   if (imagemEnviada) {
-    res = await chamarAPI("chat_imagem", sessaoAtual, texto, imagemEnviada)
-  } else {
-    res = await chamarAPI("enviar_mensagem", sessaoAtual, texto)
-  }
+    const pensando = adicionarMensagem("muted", "NOVA está olhando a imagem...")
+    const res = await chamarAPI("chat_imagem", sessaoAtual, texto, imagemEnviada)
+    pensando.remove()
+    btn.disabled = false
 
-  pensando.remove()
-  btn.disabled = false
-
-  if (res.ok) {
-    if (res.data.tipo === "imagem") {
-      adicionarMensagemImagem(res.data.resposta, res.data.imagem_base64)
+    if (res.ok) {
+      if (res.data.tipo === "imagem") {
+        adicionarMensagemImagem(res.data.resposta, res.data.imagem_base64)
+      } else {
+        adicionarMensagem("nova", res.data.resposta)
+      }
+      await carregarSessoes()
+      marcarSessaoAtiva(sessaoAtual)
     } else {
-      adicionarMensagem("nova", res.data.resposta)
+      adicionarMensagem("nova", `❌ ${res.erro}`)
     }
-    await carregarSessoes()
-    marcarSessaoAtiva(sessaoAtual)
-  } else {
-    adicionarMensagem("nova", `[Erro: ${res.erro}]`)
+    return
   }
+
+  // ── Fluxo de texto puro: STREAMING ──
+  // Cria a bubble da NOVA vazia e marca com id para os handlers encontrarem
+  const msgs = document.getElementById("chat-msgs")
+  const divNova = document.createElement("div")
+  divNova.className = "msg nova"
+  divNova.innerHTML = `
+    <div class="msg-avatar">N</div>
+    <div class="bubble" id="streaming-bubble"><span class="streaming-cursor">▍</span></div>
+  `
+  msgs.appendChild(divNova)
+  msgs.scrollTop = msgs.scrollHeight
+
+  const res = await chamarAPI("enviar_mensagem_stream", sessaoAtual, texto)
+
+  btn.disabled = false
+  // Garantia: se o streaming travou e a bubble ainda tem o cursor, remove
+  const bubble = document.getElementById("streaming-bubble")
+  if (bubble) {
+    bubble.removeAttribute("id")
+    const cursor = bubble.querySelector(".streaming-cursor")
+    if (cursor) cursor.remove()
+  }
+
+  if (!res.ok) {
+    divNova.querySelector(".bubble").textContent = `❌ ${res.erro}`
+  }
+
+  await carregarSessoes()
+  marcarSessaoAtiva(sessaoAtual)
+}
+
+// ── Handlers de streaming (chamados pelo Python via evaluate_js) ──────────────
+// O Python envia chunks da resposta em tempo real. Estes handlers anexam o
+// texto na bubble que estiver com id="streaming-bubble".
+
+window.__novaChunk = function(texto) {
+  const bubble = document.getElementById("streaming-bubble")
+  if (!bubble) return
+  // Remove o cursor temporário, anexa o texto, e re-adiciona o cursor no fim
+  const cursor = bubble.querySelector(".streaming-cursor")
+  if (cursor) cursor.remove()
+  bubble.appendChild(document.createTextNode(texto))
+  if (cursor) bubble.appendChild(cursor)
+  const msgs = document.getElementById("chat-msgs")
+  msgs.scrollTop = msgs.scrollHeight
+}
+
+window.__novaFim = function() {
+  const bubble = document.getElementById("streaming-bubble")
+  if (!bubble) return
+  bubble.removeAttribute("id")
+  const cursor = bubble.querySelector(".streaming-cursor")
+  if (cursor) cursor.remove()
+}
+
+window.__novaErro = function(msg) {
+  const bubble = document.getElementById("streaming-bubble")
+  if (!bubble) return
+  bubble.removeAttribute("id")
+  bubble.textContent = `❌ ${msg}`
 }
 
 function escapeHTML(str) {

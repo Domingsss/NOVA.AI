@@ -260,6 +260,20 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Cursor pulsante enquanto a NOVA está respondendo (streaming) */
+.streaming-cursor {
+  display: inline-block;
+  color: var(--teal);
+  animation: novaBlink 1s step-end infinite;
+  margin-left: 2px;
+  font-weight: 700;
+}
+
+@keyframes novaBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
 .msg-avatar {
   width: 28px; height: 28px;
   border-radius: 8px;
