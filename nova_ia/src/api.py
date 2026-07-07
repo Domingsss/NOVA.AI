@@ -121,6 +121,15 @@ class API:
             except Exception:
                 pass  # best-effort: não deixa o agente quebrar o chat
 
+            # Web search: se a pergunta precisa de informação atual, busca
+            # no DuckDuckGo e adiciona os resultados como contexto.
+            try:
+                ctx_web = self._tentar_web_search(mensagem or "")
+                if ctx_web:
+                    historico.append({"role": "system", "content": ctx_web})
+            except Exception:
+                pass  # best-effort: não deixa a busca quebrar o chat
+
             try:
                 resposta = chamar_groq(api_key, historico)
             except Exception as e:
@@ -178,6 +187,15 @@ class API:
                     historico.append({"role": "system", "content": ctx_agente})
             except Exception:
                 pass  # best-effort: não deixa o agente quebrar o chat
+
+            # Web search: se a pergunta precisa de informação atual, busca
+            # no DuckDuckGo e adiciona os resultados como contexto.
+            try:
+                ctx_web = self._tentar_web_search(mensagem)
+                if ctx_web:
+                    historico.append({"role": "system", "content": ctx_web})
+            except Exception:
+                pass  # best-effort: não deixa a busca quebrar o chat
 
             resposta_completa = ""
             try:
@@ -286,6 +304,106 @@ Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
                 return f"[SISTEMA — Ação executada: o usuário pediu suas tarefas pendentes. Encontrei {len(tarefas)}: {lista}. Apresente ao usuário de forma organizada.]"
 
             return None
+
+        except json.JSONDecodeError:
+            return None
+        except Exception:
+            return None
+        
+    def _tentar_web_search(self, mensagem: str):
+        """Decide se a mensagem precisa de busca na web. Se sim, faz a busca
+        no DuckDuckGo e retorna os resultados como contexto pro modelo.
+
+        Retorna None se não precisar buscar ou se a busca falhar (best-effort).
+        Requer o pacote 'duckduckgo-search' (ou 'ddgs') instalado.
+        """
+        try:
+            # ── 1. Classifica + extrai query de busca (1 chamada LLM) ──
+            system = """Analise a mensagem do usuário. Decida se ela precisa de informação ATUAL ou RECENTE que provavelmente NÃO está no seu conhecimento pré-treinado.
+
+Precisa de busca web se a mensagem pergunta sobre:
+- Notícias, eventos atuais, "o que aconteceu hoje"
+- Preços, cotações (dólar, bitcoin, ações)
+- Versões recentes de software, lançamentos
+- Documentação nova, regras/mudanças recentes
+- Pessoas vivas, fatos recentes
+- "Qual o melhor X em 2024/2025"
+
+NÃO precisa de busca se for:
+- Pergunta conceitual ("o que é X", "como funciona Y")
+- Pedido de opinião, criatividade, escrita
+- Conversa genérica, cumprimentos
+- Pedido de ação (criar tarefa/lembrete) — outro sistema cuida disso
+- Conhecimento histórico, ciência, matemática
+
+Responda APENAS com um JSON válido, sem markdown:
+{"buscar": true, "query": "search query curta em inglês"}
+ou
+{"buscar": false, "query": ""}"""
+
+            resposta = chamar_groq_simples(system, mensagem)
+            texto = resposta.strip()
+            if texto.startswith("```"):
+                texto = texto.strip("`")
+                if texto.lower().startswith("json"):
+                    texto = texto[4:]
+            texto = texto.strip()
+
+            escolha = json.loads(texto)
+            if not escolha.get("buscar", False):
+                return None
+
+            query = escolha.get("query", "").strip()
+            if not query:
+                return None
+
+            # ── 2. Faz a busca no DuckDuckGo ──
+            # Prioriza o pacote novo 'ddgs' (o antigo 'duckduckgo_search' v8
+            # está deprecated e retorna 0 resultados).
+            DDGS = None
+            try:
+                from ddgs import DDGS
+            except ImportError:
+                try:
+                    from duckduckgo_search import DDGS
+                except ImportError:
+                    return None  # busca não disponível — ignora silenciosamente
+
+            # API nova (ddgs / duckduckgo_search v6+): sem context manager
+            raw = None
+            try:
+                ddgs = DDGS()
+                raw = list(ddgs.text(query, max_results=4))
+            except Exception:
+                # Fallback: context manager (v5 e anteriores)
+                try:
+                    with DDGS() as ddgs:
+                        raw = list(ddgs.text(query, max_results=4))
+                except Exception:
+                    return None
+
+            if not raw:
+                return None
+
+            # ── 3. Formata os resultados ──
+            # O campo pode ser 'body', 'snippet' ou 'content' dependendo da versão
+            linhas = []
+            for i, r in enumerate(raw[:4], 1):
+                titulo = r.get("title", "Sem título")
+                corpo = r.get("body") or r.get("snippet") or r.get("content") or ""
+                url = r.get("href") or r.get("url") or r.get("link") or ""
+                linhas.append(f"[{i}] {titulo}\n{corpo}\nFonte: {url}")
+
+            formatado = "\n\n".join(linhas)
+
+            return (
+                f"[SISTEMA — Resultados de busca web para '{query}':\n\n"
+                f"{formatado}\n\n"
+                f"Use estas informações atualizadas para responder ao usuário de "
+                f"forma natural. Cite as fontes quando relevante (ex: 'segundo o "
+                f"site X...'). Se os resultados não ajudarem, diga que não encontrou "
+                f"informação atualizada.]"
+            )
 
         except json.JSONDecodeError:
             return None

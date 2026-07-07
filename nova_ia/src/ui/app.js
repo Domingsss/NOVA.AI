@@ -2,7 +2,6 @@
 // NOVA — app.js
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ── Estado global ─────────────────────────────────────────────────────────────
 let sessaoAtual = null
 let focoInterval = null
 let focoSegundos = 0
@@ -10,7 +9,6 @@ let focoFase = "foco"
 let focoPausado = false
 let imagemAtual = null
 
-// ── Utilitário: chama função Python via pywebview ─────────────────────────────
 async function chamarAPI(fn, ...args) {
   try {
     const raw = await window.pywebview.api[fn](...args)
@@ -21,10 +19,19 @@ async function chamarAPI(fn, ...args) {
   }
 }
 
-// ── Inicialização ─────────────────────────────────────────────────────────────
+function agoraHora() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
+}
+
+function esconderSplash() {
+  const splash = document.getElementById("splash")
+  if (splash) setTimeout(() => splash.classList.add("hidden"), 1200)
+}
+
 window.addEventListener("pywebviewready", async () => {
-  // Anexa TODOS os event listeners primeiro (síncrono). Assim a UI fica
-  // clicável imediatamente, mesmo que o carregamento assíncrono falhe.
+  esconderSplash()
+
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => trocarAba(btn.dataset.aba))
   })
@@ -44,16 +51,78 @@ window.addEventListener("pywebviewready", async () => {
     document.getElementById("cor-fundo-label").textContent = e.target.value
   })
 
-  // Agora sim: carrega os dados (best-effort, não trava a UI se falhar)
+  const chatMsgs = document.getElementById("chat-msgs")
+  chatMsgs.addEventListener("scroll", () => {
+    const btn = document.getElementById("scroll-bottom-btn")
+    const pertoDoFim = chatMsgs.scrollHeight - chatMsgs.scrollTop - chatMsgs.clientHeight < 80
+    btn.classList.toggle("visible", !pertoDoFim)
+  })
+
   try { await abrirUltimaConversa() } catch (e) { console.error("abrirUltimaConversa:", e) }
   try { await carregarResumoMatinal() } catch (e) { console.error("carregarResumoMatinal:", e) }
   try { await atualizarStatsFoco() } catch (e) { console.error("atualizarStatsFoco:", e) }
+  try { await atualizarBadges() } catch (e) { console.error("atualizarBadges:", e) }
+  try { await atualizarKeyDot() } catch (e) { console.error("atualizarKeyDot:", e) }
 })
 
-// ══════════════════════════════════════════════════════════════════════════════
-// NAVEGAÇÃO
-// ══════════════════════════════════════════════════════════════════════════════
+// BADGES DA SIDEBAR
+async function atualizarBadges() {
+  try {
+    const res = await chamarAPI("get_tarefas")
+    if (res.ok) {
+      const pendentes = res.data.filter(t => t.status === "pendente").length
+      const badge = document.getElementById("badge-tarefas")
+      if (pendentes > 0) {
+        badge.textContent = pendentes > 9 ? "9+" : pendentes
+        badge.style.display = "inline-block"
+      } else {
+        badge.style.display = "none"
+      }
+      const sub = document.getElementById("subtitle-tarefas")
+      if (sub) sub.textContent = `${pendentes} pendente(s) · ${res.data.length - pendentes} concluída(s)`
+    }
+  } catch (e) {}
 
+  try {
+    const res = await chamarAPI("get_lembretes")
+    if (res.ok) {
+      const total = res.data.length
+      const badge = document.getElementById("badge-lembretes")
+      if (total > 0) {
+        badge.textContent = total > 9 ? "9+" : total
+        badge.style.display = "inline-block"
+      } else {
+        badge.style.display = "none"
+      }
+      const sub = document.getElementById("subtitle-lembretes")
+      if (sub) sub.textContent = `${total} lembrete(s) ativo(s)`
+    }
+  } catch (e) {}
+
+  try {
+    const res = await chamarAPI("get_habitos")
+    if (res.ok) {
+      const feitos = res.data.filter(h => h.feito_hoje).length
+      const sub = document.getElementById("subtitle-habitos")
+      if (sub) sub.textContent = `${feitos}/${res.data.length} feitos hoje`
+    }
+  } catch (e) {}
+}
+
+// INDICADOR DE API KEY
+async function atualizarKeyDot() {
+  try {
+    const res = await chamarAPI("get_api_key")
+    const dot = document.getElementById("key-dot")
+    if (res.ok && res.data.tem_key) {
+      dot.classList.add("configured")
+    } else {
+      dot.classList.remove("configured")
+    }
+  } catch (e) {}
+}
+
+// NAVEGAÇÃO
 function trocarAba(aba) {
   document.querySelectorAll(".aba").forEach(a => a.classList.remove("active"))
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"))
@@ -66,24 +135,17 @@ function trocarAba(aba) {
   if (aba === "foco")      atualizarStatsFoco()
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 // CHAT
-// ══════════════════════════════════════════════════════════════════════════════
-
-// Ao abrir o app, continua a conversa mais recente em vez de criar uma nova
-// em branco. Só cria uma nova se não houver nenhuma ainda.
 async function abrirUltimaConversa() {
   const res = await chamarAPI("get_sessoes")
   if (!res.ok || !res.data || res.data.length === 0) {
     await novaConversa()
     return
   }
-  const ultima = res.data[0]  // listar_sessoes já vem ordenado por criado_em DESC
+  const ultima = res.data[0]
   sessaoAtual = ultima.id
   await carregarSessoes()
   marcarSessaoAtiva(sessaoAtual)
-  // Carrega o histórico direto — não chama abrirSessao/trocarAba porque a aba
-  // chat já é a ativa por padrão no HTML.
   const hist = await chamarAPI("get_historico", ultima.id)
   if (hist.ok) {
     const msgs = document.getElementById("chat-msgs")
@@ -111,7 +173,7 @@ async function carregarSessoes() {
     f.className = "sessao-item" + (s.id === sessaoAtual ? " ativa" : "")
     f.dataset.id = s.id
     f.innerHTML = `
-      <span class="sessao-titulo">💬 ${s.titulo}</span>
+      <span class="sessao-titulo">💬 ${escapeHTML(s.titulo)}</span>
       <button class="sessao-del" onclick="deletarSessao(${s.id}, event)">✕</button>
     `
     f.addEventListener("click", () => abrirSessao(s.id))
@@ -136,13 +198,9 @@ async function abrirSessao(id) {
   res.data.forEach(m => adicionarMensagem(m.role === "user" ? "user" : "nova", m.content))
 }
 
-// Deletar sessão: remove de verdade do banco e troca para outra conversa
-// existente em vez de sempre criar uma nova em branco (comportamento de
-// "fechar aba", não apenas "limpar tela").
 async function deletarSessao(id, e) {
   e.stopPropagation()
   await chamarAPI("deletar_sessao", id)
-
   if (sessaoAtual === id) {
     const res = await chamarAPI("get_sessoes")
     if (res.ok && res.data.length > 0) {
@@ -158,21 +216,31 @@ async function deletarSessao(id, e) {
 async function carregarResumoMatinal() {
   const res = await chamarAPI("get_resumo_matinal")
   if (!res.ok) return
-  adicionarMensagem("nova", res.data.resumo)
+  adicionarMensagem("nova", res.data.resumo, "resumo")
 }
 
-function adicionarMensagem(tipo, texto) {
+function adicionarMensagem(tipo, texto, extraClass = "") {
   const msgs = document.getElementById("chat-msgs")
   const div = document.createElement("div")
-  div.className = `msg ${tipo}`
+  div.className = `msg ${tipo}${extraClass ? " " + extraClass : ""}`
+  const hora = agoraHora()
 
   if (tipo === "nova") {
     div.innerHTML = `
       <div class="msg-avatar">N</div>
-      <div class="bubble">${escapeHTML(texto)}</div>
+      <div>
+        <div class="bubble">${escapeHTML(texto)}</div>
+        <div class="msg-meta">${hora}</div>
+      </div>
     `
+    if (!extraClass) div.classList.add("nova-flash")
   } else if (tipo === "user") {
-    div.innerHTML = `<div class="bubble">${escapeHTML(texto)}</div>`
+    div.innerHTML = `
+      <div>
+        <div class="bubble">${escapeHTML(texto)}</div>
+        <div class="msg-meta">${hora}</div>
+      </div>
+    `
   } else {
     div.innerHTML = `<div class="bubble">${escapeHTML(texto)}</div>`
     div.classList.add("muted")
@@ -183,16 +251,19 @@ function adicionarMensagem(tipo, texto) {
   return div
 }
 
-// Mensagem da NOVA contendo uma imagem (resultado de edição)
 function adicionarMensagemImagem(texto, base64Img) {
   const msgs = document.getElementById("chat-msgs")
   const div = document.createElement("div")
-  div.className = "msg nova"
+  div.className = "msg nova nova-flash"
+  const hora = agoraHora()
   div.innerHTML = `
     <div class="msg-avatar">N</div>
-    <div class="bubble" style="padding:8px">
-      <img src="${base64Img}" style="max-width:260px; max-height:260px; border-radius:8px; display:block; margin-bottom:6px"/>
-      <span>${escapeHTML(texto)}</span>
+    <div>
+      <div class="bubble" style="padding:8px">
+        <img src="${base64Img}" style="max-width:260px; max-height:260px; border-radius:8px; display:block; margin-bottom:6px"/>
+        <span>${escapeHTML(texto)}</span>
+      </div>
+      <div class="msg-meta">${hora}</div>
     </div>
   `
   msgs.appendChild(div)
@@ -200,14 +271,11 @@ function adicionarMensagemImagem(texto, base64Img) {
   return div
 }
 
-// ── Imagem anexada no chat ──────────────────────────────────────────────────────
-
 let imagemChatB64 = null
 
 function previewImagem(event) {
   const file = event.target.files[0]
   if (!file) return
-
   const reader = new FileReader()
   reader.onload = e => {
     imagemChatB64 = e.target.result
@@ -222,6 +290,35 @@ function removerImagem() {
   document.getElementById("chat-preview-wrap").style.display = "none"
   document.getElementById("chat-preview-img").src = ""
   document.getElementById("chat-imagem").value = ""
+}
+
+function scrollChatBottom() {
+  const msgs = document.getElementById("chat-msgs")
+  msgs.scrollTop = msgs.scrollHeight
+  document.getElementById("scroll-bottom-btn").classList.remove("visible")
+}
+
+function adicionarTyping() {
+  const msgs = document.getElementById("chat-msgs")
+  const div = document.createElement("div")
+  div.className = "msg nova"
+  div.id = "typing-msg"
+  div.innerHTML = `
+    <div class="msg-avatar">N</div>
+    <div class="bubble" style="padding:0">
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  `
+  msgs.appendChild(div)
+  msgs.scrollTop = msgs.scrollHeight
+  return div
+}
+
+function removerTyping() {
+  const t = document.getElementById("typing-msg")
+  if (t) t.remove()
 }
 
 async function enviarMensagem() {
@@ -239,10 +336,14 @@ async function enviarMensagem() {
     const msgs = document.getElementById("chat-msgs")
     const div = document.createElement("div")
     div.className = "msg user"
+    const hora = agoraHora()
     div.innerHTML = `
-      <div class="bubble" style="padding:6px">
-        <img src="${imagemEnviada}" style="max-width:200px; max-height:200px; border-radius:8px; display:block"/>
-        ${texto ? `<span style="display:block; margin-top:6px">${escapeHTML(texto)}</span>` : ""}
+      <div>
+        <div class="bubble" style="padding:6px">
+          <img src="${imagemEnviada}" style="max-width:200px; max-height:200px; border-radius:8px; display:block"/>
+          ${texto ? `<span style="display:block; margin-top:6px">${escapeHTML(texto)}</span>` : ""}
+        </div>
+        <div class="msg-meta">${hora}</div>
       </div>
     `
     msgs.appendChild(div)
@@ -256,11 +357,10 @@ async function enviarMensagem() {
   const btn = document.getElementById("chat-send")
   btn.disabled = true
 
-  // ── Fluxo com imagem: sem streaming (a resposta é curta/édita imagem) ──
   if (imagemEnviada) {
-    const pensando = adicionarMensagem("muted", "NOVA está olhando a imagem...")
+    const pensando = adicionarTyping()
     const res = await chamarAPI("chat_imagem", sessaoAtual, texto, imagemEnviada)
-    pensando.remove()
+    removerTyping()
     btn.disabled = false
 
     if (res.ok) {
@@ -277,45 +377,51 @@ async function enviarMensagem() {
     return
   }
 
-  // ── Fluxo de texto puro: STREAMING ──
-  // Cria a bubble da NOVA vazia e marca com id para os handlers encontrarem
-  const msgs = document.getElementById("chat-msgs")
-  const divNova = document.createElement("div")
-  divNova.className = "msg nova"
-  divNova.innerHTML = `
-    <div class="msg-avatar">N</div>
-    <div class="bubble" id="streaming-bubble"><span class="streaming-cursor">▍</span></div>
-  `
-  msgs.appendChild(divNova)
-  msgs.scrollTop = msgs.scrollHeight
+  const typing = adicionarTyping()
+  let streamingDiv = null
+
+  window.__novaPrimeiroChunk = function() {
+    removerTyping()
+    if (streamingDiv) return
+    const msgs = document.getElementById("chat-msgs")
+    streamingDiv = document.createElement("div")
+    streamingDiv.className = "msg nova nova-flash"
+    const hora = agoraHora()
+    streamingDiv.innerHTML = `
+      <div class="msg-avatar">N</div>
+      <div>
+        <div class="bubble" id="streaming-bubble"><span class="streaming-cursor">▍</span></div>
+        <div class="msg-meta">${hora}</div>
+      </div>
+    `
+    msgs.appendChild(streamingDiv)
+    msgs.scrollTop = msgs.scrollHeight
+  }
 
   const res = await chamarAPI("enviar_mensagem_stream", sessaoAtual, texto)
 
   btn.disabled = false
-  // Garantia: se o streaming travou e a bubble ainda tem o cursor, remove
+  removerTyping()
+
   const bubble = document.getElementById("streaming-bubble")
   if (bubble) {
     bubble.removeAttribute("id")
     const cursor = bubble.querySelector(".streaming-cursor")
     if (cursor) cursor.remove()
-  }
-
-  if (!res.ok) {
-    divNova.querySelector(".bubble").textContent = `❌ ${res.erro}`
+  } else if (!res.ok) {
+    adicionarMensagem("nova", `❌ ${res.erro}`)
   }
 
   await carregarSessoes()
   marcarSessaoAtiva(sessaoAtual)
 }
 
-// ── Handlers de streaming (chamados pelo Python via evaluate_js) ──────────────
-// O Python envia chunks da resposta em tempo real. Estes handlers anexam o
-// texto na bubble que estiver com id="streaming-bubble".
-
 window.__novaChunk = function(texto) {
+  if (!document.getElementById("streaming-bubble")) {
+    window.__novaPrimeiroChunk()
+  }
   const bubble = document.getElementById("streaming-bubble")
   if (!bubble) return
-  // Remove o cursor temporário, anexa o texto, e re-adiciona o cursor no fim
   const cursor = bubble.querySelector(".streaming-cursor")
   if (cursor) cursor.remove()
   bubble.appendChild(document.createTextNode(texto))
@@ -333,6 +439,9 @@ window.__novaFim = function() {
 }
 
 window.__novaErro = function(msg) {
+  if (!document.getElementById("streaming-bubble")) {
+    window.__novaPrimeiroChunk()
+  }
   const bubble = document.getElementById("streaming-bubble")
   if (!bubble) return
   bubble.removeAttribute("id")
@@ -347,10 +456,7 @@ function escapeHTML(str) {
     .replace(/\n/g, "<br>")
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 // API KEY
-// ══════════════════════════════════════════════════════════════════════════════
-
 function abrirModalKey() {
   document.getElementById("modal-key").style.display = "flex"
   document.getElementById("input-key").focus()
@@ -361,23 +467,38 @@ async function salvarKey() {
   if (!key) return
   await chamarAPI("salvar_api_key", key)
   fecharModal("modal-key")
+  await atualizarKeyDot()
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TAREFAS
-// ══════════════════════════════════════════════════════════════════════════════
+// SKELETON LOADING
+function mostrarSkeleton(lista, n = 3) {
+  lista.innerHTML = ""
+  for (let i = 0; i < n; i++) {
+    const sk = document.createElement("div")
+    sk.className = "skeleton-card"
+    sk.innerHTML = `
+      <div style="flex:1">
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+    `
+    lista.appendChild(sk)
+  }
+}
 
+// TAREFAS
 async function carregarTarefas() {
-  const res = await chamarAPI("get_tarefas")
-  if (!res.ok) return
   const lista = document.getElementById("lista-tarefas")
+  mostrarSkeleton(lista)
+  const res = await chamarAPI("get_tarefas")
+  if (!res.ok) { lista.innerHTML = ""; return }
   lista.innerHTML = ""
 
   const pendentes  = res.data.filter(t => t.status === "pendente")
   const concluidas = res.data.filter(t => t.status === "concluida")
 
   if (!res.data.length) {
-    lista.innerHTML = `<p class="empty-msg">Nenhuma tarefa ainda. Que tal criar uma?</p>`
+    lista.innerHTML = `<div class="empty-msg"><div class="empty-icon">✅</div><div class="empty-title">Sem tarefas</div><div class="empty-desc">Nenhuma tarefa ainda. Que tal criar uma?</div></div>`
     return
   }
 
@@ -393,8 +514,8 @@ async function carregarTarefas() {
 }
 
 function cardTarefa(t, concluida = false) {
-  const cores = { alta: "#ff5f5f", media: "#ffb347", baixa: "#1de9b6" }
-  const cor = cores[t.prioridade] || "#7a7890"
+  const cores = { alta: "#dc2626", media: "#d97706", baixa: "#059669" }
+  const cor = cores[t.prioridade] || "#a1a29e"
   const div = document.createElement("div")
   div.className = "card"
   div.innerHTML = `
@@ -432,30 +553,31 @@ async function criarTarefa() {
   document.getElementById("tarefa-desc").value = ""
   document.getElementById("tarefa-prazo").value = ""
   await carregarTarefas()
+  await atualizarBadges()
 }
 
 async function concluirTarefa(id) {
   await chamarAPI("concluir_tarefa", id)
   await carregarTarefas()
+  await atualizarBadges()
 }
 
 async function deletarTarefa(id) {
   await chamarAPI("deletar_tarefa", id)
   await carregarTarefas()
+  await atualizarBadges()
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 // LEMBRETES
-// ══════════════════════════════════════════════════════════════════════════════
-
 async function carregarLembretes() {
-  const res = await chamarAPI("get_lembretes")
-  if (!res.ok) return
   const lista = document.getElementById("lista-lembretes")
+  mostrarSkeleton(lista)
+  const res = await chamarAPI("get_lembretes")
+  if (!res.ok) { lista.innerHTML = ""; return }
   lista.innerHTML = ""
 
   if (!res.data.length) {
-    lista.innerHTML = `<p class="empty-msg">Nenhum lembrete ativo.</p>`
+    lista.innerHTML = `<div class="empty-msg"><div class="empty-icon">⏰</div><div class="empty-title">Sem lembretes</div><div class="empty-desc">Nenhum lembrete ativo no momento.</div></div>`
     return
   }
 
@@ -494,25 +616,25 @@ async function criarLembrete() {
   fecharModal("modal-lembrete")
   document.getElementById("lembrete-titulo").value = ""
   await carregarLembretes()
+  await atualizarBadges()
 }
 
 async function deletarLembrete(id) {
   await chamarAPI("deletar_lembrete", id)
   await carregarLembretes()
+  await atualizarBadges()
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 // HÁBITOS
-// ══════════════════════════════════════════════════════════════════════════════
-
 async function carregarHabitos() {
-  const res = await chamarAPI("get_habitos")
-  if (!res.ok) return
   const lista = document.getElementById("lista-habitos")
+  mostrarSkeleton(lista)
+  const res = await chamarAPI("get_habitos")
+  if (!res.ok) { lista.innerHTML = ""; return }
   lista.innerHTML = ""
 
   if (!res.data.length) {
-    lista.innerHTML = `<p class="empty-msg">Nenhum hábito ainda. Crie um!</p>`
+    lista.innerHTML = `<div class="empty-msg"><div class="empty-icon">📊</div><div class="empty-title">Sem hábitos</div><div class="empty-desc">Nenhum hábito ainda. Crie um pra começar a acompanhar!</div></div>`
     return
   }
 
@@ -551,22 +673,22 @@ async function criarHabito() {
   fecharModal("modal-habito")
   document.getElementById("habito-nome").value = ""
   await carregarHabitos()
+  await atualizarBadges()
 }
 
 async function toggleHabito(id) {
   await chamarAPI("registrar_habito", id)
   await carregarHabitos()
+  await atualizarBadges()
 }
 
 async function deletarHabito(id) {
   await chamarAPI("deletar_habito", id)
   await carregarHabitos()
+  await atualizarBadges()
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 // FOCO
-// ══════════════════════════════════════════════════════════════════════════════
-
 async function atualizarStatsFoco() {
   const res = await chamarAPI("get_stats_foco")
   if (!res.ok) return
@@ -608,7 +730,7 @@ function focoIniciar() {
             clearInterval(focoInterval)
             chamarAPI("salvar_sessao_foco", duracaoMin, pausaMin, true)
             focoReset(duracaoMin)
-            atualizarStatsFoco()
+            aktualizarStatsFoco()
           }
         }, 1000)
       }
@@ -648,10 +770,7 @@ function atualizarTimerDisplay(seg) {
   document.getElementById("foco-timer").textContent = `${m}:${s}`
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// IMAGENS (aba dedicada)
-// ══════════════════════════════════════════════════════════════════════════════
-
+// IMAGENS
 async function selecionarImagem() {
   const res = await chamarAPI("abrir_arquivo_dialogo")
   if (!res.ok || !res.data) return
@@ -746,10 +865,7 @@ async function aplicarEdicaoTexto() {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 // MODAIS
-// ══════════════════════════════════════════════════════════════════════════════
-
 function fecharModal(id) {
   document.getElementById(id).style.display = "none"
 }
