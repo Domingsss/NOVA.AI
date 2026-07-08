@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>NOVA</title>
 <link rel="stylesheet" href="style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -58,21 +59,23 @@
   <div id="lista-sessoes"></div>
 
   <div id="sidebar-footer">
-    <button class="footer-btn" onclick="abrirModalKey()">
+    <button class="footer-btn" onclick="abrirModalConfig()">
       <span class="key-dot" id="key-dot"></span>
-      <svg class="footer-icon" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z"/></svg>
-      <span>API Key</span>
+      <svg class="footer-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Configurações</span>
     </button>
   </div>
 </aside>
 
-<div id="divider"></div>
+<div id="sidebar-resizer"></div>
 
 <!-- CONTEÚDO -->
 <main id="conteudo">
 
   <!-- CHAT -->
   <section id="aba-chat" class="aba active">
+    <div id="chat-progress-bar"></div>
+
     <div id="chat-header">
       <div class="chat-header-avatar">N</div>
       <div class="chat-header-info">
@@ -82,7 +85,14 @@
           <span>online · assistente pessoal</span>
         </div>
       </div>
+      <div class="chat-header-actions">
+        <button class="icon-btn" onclick="toggleTheme()" title="Alternar tema">
+          <svg id="theme-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
     </div>
+
+    <div id="chat-particles"></div>
 
     <div id="chat-msgs"></div>
 
@@ -162,8 +172,21 @@
       </div>
     </div>
     <div id="foco-centro">
-      <div id="foco-fase">FOCO</div>
-      <div id="foco-timer">25:00</div>
+      <div class="foco-ring-wrap">
+        <svg id="foco-ring" viewBox="0 0 240 240">
+          <defs>
+            <linearGradient id="foco-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#7c3aed"/>
+              <stop offset="50%" stop-color="#c026d3"/>
+              <stop offset="100%" stop-color="#f59e0b"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg" cx="120" cy="120" r="110"/>
+          <circle class="ring-fg" cx="120" cy="120" r="110"/>
+        </svg>
+        <div id="foco-fase">FOCO</div>
+        <div id="foco-timer">25:00</div>
+      </div>
       <div id="foco-stats"></div>
       <div id="foco-config">
         <label>Foco (min) <input id="foco-min" type="number" value="25" min="1" max="120"/></label>
@@ -279,15 +302,77 @@
 
 </main>
 
-<!-- MODAIS -->
-<div id="modal-key" class="modal" style="display:none">
-  <div class="modal-box">
-    <h3>⚙ API Key</h3>
-    <p class="modal-sub">console.groq.com → API Keys → Create</p>
-    <input type="password" id="input-key" placeholder="Cole sua Groq API key..."/>
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- MENU DE CONTEXTO -->
+<div id="context-menu">
+  <div class="ctx-item" onclick="ctxCopy()">
+    <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Copiar
+  </div>
+  <div class="ctx-item" onclick="ctxRegenerate()">
+    <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    Regenerar
+  </div>
+  <div class="ctx-separator"></div>
+  <div class="ctx-item danger" onclick="ctxDelete()">
+    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    Deletar
+  </div>
+</div>
+
+<!-- ATALHOS HINT -->
+<div class="shortcut-hint" id="shortcut-hint">
+  <kbd>Ctrl</kbd>+<kbd>K</kbd> nova conversa &nbsp;·&nbsp; <kbd>Ctrl</kbd>+<kbd>/</kbd> atalhos
+</div>
+
+<!-- MODAL CONFIGURAÇÕES -->
+<div id="modal-config" class="modal" style="display:none">
+  <div class="modal-box modal-lg">
+    <h3>Configurações</h3>
+
+    <div class="modal-section">
+      <div class="modal-section-label">API Key</div>
+      <input type="password" id="input-key" placeholder="Cole sua Groq API key..."/>
+      <div class="modal-row">
+        <div>
+          <div class="modal-row-label">API Key configurada</div>
+          <div class="modal-row-desc" id="key-status">Verificando...</div>
+        </div>
+        <div class="key-dot" id="key-dot-modal"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Tema</div>
+      <div class="theme-options">
+        <div class="theme-option" data-theme="light" onclick="setTheme('light')">☀️ Claro</div>
+        <div class="theme-option" data-theme="dark" onclick="setTheme('dark')">🌙 Escuro</div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Aparência</div>
+      <div class="modal-row">
+        <div>
+          <div class="modal-row-label">Partículas cósmicas no chat</div>
+          <div class="modal-row-desc">Estrelinhas flutuando no fundo</div>
+        </div>
+        <div class="toggle on" id="toggle-particles" onclick="toggleSetting('particles', this)"></div>
+      </div>
+      <div class="modal-row">
+        <div>
+          <div class="modal-row-label">Animações</div>
+          <div class="modal-row-desc">Transições e efeitos visuais</div>
+        </div>
+        <div class="toggle on" id="toggle-animations" onclick="toggleSetting('animations', this)"></div>
+      </div>
+    </div>
+
     <div class="modal-btns">
-      <button class="btn-secondary" onclick="fecharModal('modal-key')">Cancelar</button>
-      <button class="btn-primary" onclick="salvarKey()">Salvar</button>
+      <button class="btn-secondary" onclick="fecharModal('modal-config')">Fechar</button>
+      <button class="btn-primary" onclick="salvarConfig()">Salvar</button>
     </div>
   </div>
 </div>
