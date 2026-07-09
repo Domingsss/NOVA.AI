@@ -1,0 +1,15 @@
+{
+  "vault_path": "E:\\desenvolvimento\\obsidian\\NOVA",
+  "commits_folder": "Commits",
+  "project_name": "NOVA",
+  "api_key_paths": [
+    "src/APICHV.json",
+    "data/APICHV.json",
+    "APICHV.json"
+  ],
+  "groq_model": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "max_diff_chars": 8000,
+  "default_tags": ["commit", "nova", "desenvolvimento"],
+  "include_diff": true,
+  "max_diff_in_markdown": 3000
+}

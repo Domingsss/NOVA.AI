@@ -1,8 +1,0 @@
-BG        = "#0a0a0f"
-SURFACE   = "#111118"
-SURFACE2  = "#1a1a24"
-PURPLE    = "#7c6fff"
-TEAL      = "#1de9b6"
-TEXT      = "#e8e6f0"
-MUTED     = "#7a7890"
-WHITE     = "#ffffff"
