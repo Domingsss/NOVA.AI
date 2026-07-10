@@ -166,7 +166,7 @@ def build_markdown(commit_info, stats, summary, diff, config):
         diff_section = f"""
 > [!info]- 📝 Diff Completo (clique para expandir)
 > ```diff
-> {diff_trunc.replace('\n', '\n> ')}
+> {diff_trunc.replace(chr(10), chr(10) + '> ')}
 > ```
 """
 
@@ -190,10 +190,10 @@ tags: [{tags_yaml}]
 > 👤 **Autor:** {commit_info['author']} · 🕒 **Data:** {data_str} às {hora_str} · 🔗 **Hash:** `{hash_short}`
 
 > [!example]- 📁 Arquivos Modificados
-> {tabela.replace('\n', '\n> ')}
+> {tabela.replace(chr(10), chr(10) + '> ')}
 
 > [!ai]+ 🤖 Resumo Inteligente
-> {summary.replace('\n', '\n> ')}
+> {summary.replace(chr(10), chr(10) + '> ')}
 {diff_section}
 ---
 
