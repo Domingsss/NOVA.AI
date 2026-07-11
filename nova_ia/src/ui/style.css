@@ -696,3 +696,48 @@ input[type=color] { width: 38px; height: 38px; border: 1px solid var(--border); 
 .shortcut-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--sidebar-bg); color: var(--sidebar-text); padding: 8px 14px; border-radius: var(--radius-pill); font-size: 11px; box-shadow: var(--shadow-lg); z-index: 999; display: none; border: 1px solid var(--sidebar-border); }
 .shortcut-hint.visible { display: block; animation: toastIn 0.2s ease; }
 .shortcut-hint kbd { background: var(--sidebar-active); padding: 2px 6px; border-radius: 4px; font-family: monospace; margin: 0 2px; font-size: 10px; }
+
+/* Slider de tema no header */
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  transition: all 0.15s;
+}
+
+.theme-switcher:hover {
+  background: var(--accent-soft);
+}
+
+.theme-ico {
+  width: 14px;
+  height: 14px;
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: color 0.15s;
+}
+
+.theme-switcher:hover .theme-ico {
+  color: var(--violeta);
+}
+
+/* Ajuste do toggle do header pra ficar menor */
+#header-theme-toggle {
+  width: 36px;
+  height: 20px;
+}
+
+#header-theme-toggle::after {
+  width: 16px;
+  height: 16px;
+}
+
+#header-theme-toggle.on::after {
+  transform: translateX(16px);
+}

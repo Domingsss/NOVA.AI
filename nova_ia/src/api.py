@@ -799,3 +799,26 @@ com o prompt em inglês, sem explicações, sem aspas, sem texto adicional."""
             return self._ok()
         except Exception as e:
             return self._erro(e)
+        
+            # ── Tema (salvar/carregar) ─────────────────────────────────────────────────
+    def salvar_tema(self, tema: str):
+        try:
+            import database
+            caminho = os.path.join(database.BASE_DIR, 'theme.json')
+            with open(caminho, 'w') as f:
+                json.dump({"tema": tema}, f)
+            return self._ok()
+        except Exception as e:
+            return self._erro(e)
+
+    def carregar_tema(self):
+        try:
+            import database
+            caminho = os.path.join(database.BASE_DIR, 'theme.json')
+            if os.path.exists(caminho):
+                with open(caminho, 'r') as f:
+                    data = json.load(f)
+                    return self._ok({"tema": data.get("tema", "light")})
+            return self._ok({"tema": "light"})
+        except Exception as e:
+            return self._erro(e)

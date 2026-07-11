@@ -83,32 +83,42 @@ function criarParticulas() {
 function aplicarTema(tema) {
   document.body.setAttribute("data-theme", tema)
   settings.theme = tema
+  
+  // Atualiza o slider do header
+  const headerToggle = document.getElementById("header-theme-toggle")
+  if (headerToggle) headerToggle.classList.toggle("on", tema === "dark")
+  
+  // Atualiza os botões no modal de configurações
   document.querySelectorAll(".theme-option").forEach(opt => {
     opt.classList.toggle("active", opt.dataset.theme === tema)
   })
-  const icon = document.getElementById("theme-icon")
-  if (icon) {
-    if (tema === "dark") {
-      icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
-    } else {
-      icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
-    }
-  }
 }
 
-function toggleTheme() {
+async function toggleTheme() {
   const novo = settings.theme === "light" ? "dark" : "light"
   aplicarTema(novo)
-  showToast(`Tema ${novo === "dark" ? "escuro" : "claro"}`, "", "info", 1500)
+  await chamarAPI("salvar_tema", novo)
 }
 
 function setTheme(tema) { aplicarTema(tema) }
 
 window.addEventListener("pywebviewready", async () => {
   esconderSplash()
-  aplicarTema("light")
+  
+  // Carrega o tema salvo do backend
+  try {
+    const res = await chamarAPI("carregar_tema")
+    if (res.ok) {
+      aplicarTema(res.data.tema || "light")
+    } else {
+      aplicarTema("light")
+    }
+  } catch (e) {
+    aplicarTema("light")
+  }
+  
   criarParticulas()
-
+  
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => trocarAba(btn.dataset.aba))
   })
