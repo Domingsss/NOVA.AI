@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════════════════
-// NOVA — app.js
-// ═══════════════════════════════════════════════════════════════════════════════
-
 let sessaoAtual = null
 let focoInterval = null
 let focoSegundos = 0
@@ -14,137 +10,47 @@ let ultimaMsgNova = null
 let contextMsgEl = null
 
 async function chamarAPI(fn, ...args) {
-  try {
-    const raw = await window.pywebview.api[fn](...args)
-    return JSON.parse(raw)
-  } catch (e) {
-    console.error(`Erro ao chamar ${fn}:`, e)
-    return { ok: false, erro: String(e) }
-  }
+  try { const raw = await window.pywebview.api[fn](...args); return JSON.parse(raw) }
+  catch (e) { console.error(`Erro ao chamar ${fn}:`, e); return { ok: false, erro: String(e) } }
 }
-
-function agoraHora() {
-  const d = new Date()
-  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
-}
-
-function escapeHTML(str) {
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-}
-
-function renderMarkdown(texto) {
-  if (typeof marked !== "undefined") {
-    try { return marked.parse(texto) } catch (e) {}
-  }
-  return escapeHTML(texto).replace(/\n/g, "<br>")
-}
-
-function esconderSplash() {
-  const splash = document.getElementById("splash")
-  if (splash) setTimeout(() => splash.classList.add("hidden"), 1200)
-}
-
+function agoraHora() { const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}` }
+function escapeHTML(str) { return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+function renderMarkdown(texto) { if (typeof marked !== "undefined") { try { return marked.parse(texto) } catch (e) {} } return escapeHTML(texto).replace(/\n/g, "<br>") }
+function esconderSplash() { const s = document.getElementById("splash"); if (s) setTimeout(() => s.classList.add("hidden"), 1200) }
 function showToast(titulo, msg = "", tipo = "info", duracao = 3500) {
-  const container = document.getElementById("toast-container")
-  const toast = document.createElement("div")
-  toast.className = `toast ${tipo}`
-  const icones = { success: "✓", error: "✕", warning: "⚠", info: "ℹ" }
-  toast.innerHTML = `
-    <div class="toast-icon">${icones[tipo] || "ℹ"}</div>
-    <div class="toast-content">
-      <div class="toast-title">${escapeHTML(titulo)}</div>
-      ${msg ? `<div class="toast-msg">${escapeHTML(msg)}</div>` : ""}
-    </div>
-  `
-  container.appendChild(toast)
-  setTimeout(() => {
-    toast.classList.add("fade-out")
-    setTimeout(() => toast.remove(), 300)
-  }, duracao)
+  const c = document.getElementById("toast-container"); const t = document.createElement("div"); t.className = `toast ${tipo}`
+  const ic = { success: "✓", error: "✕", warning: "⚠", info: "ℹ" }
+  t.innerHTML = `<div class="toast-icon">${ic[tipo] || "ℹ"}</div><div class="toast-content"><div class="toast-title">${escapeHTML(titulo)}</div>${msg ? `<div class="toast-msg">${escapeHTML(msg)}</div>` : ""}</div>`
+  c.appendChild(t); setTimeout(() => { t.classList.add("fade-out"); setTimeout(() => t.remove(), 300) }, duracao)
 }
-
 function criarParticulas() {
-  const container = document.getElementById("chat-particles")
-  if (!container) return
-  container.innerHTML = ""
+  const c = document.getElementById("chat-particles"); if (!c) return; c.innerHTML = ""
   if (!settings.particles) return
   const cores = ["", "magenta", "amber", "cyan"]
-  for (let i = 0; i < 20; i++) {
-    const p = document.createElement("div")
-    p.className = "particle " + cores[Math.floor(Math.random() * cores.length)]
-    if (Math.random() > 0.7) p.classList.add("big")
-    p.style.left = Math.random() * 100 + "%"
-    p.style.animationDuration = (12 + Math.random() * 10) + "s"
-    p.style.animationDelay = (Math.random() * 15) + "s"
-    container.appendChild(p)
-  }
+  for (let i = 0; i < 20; i++) { const p = document.createElement("div"); p.className = "particle " + cores[Math.floor(Math.random() * cores.length)]; if (Math.random() > 0.7) p.classList.add("big"); p.style.left = Math.random() * 100 + "%"; p.style.animationDuration = (12 + Math.random() * 10) + "s"; p.style.animationDelay = (Math.random() * 15) + "s"; c.appendChild(p) }
 }
-
 function aplicarTema(tema) {
-  document.body.setAttribute("data-theme", tema)
-  settings.theme = tema
-  
-  // Atualiza o slider do header
-  const headerToggle = document.getElementById("header-theme-toggle")
-  if (headerToggle) headerToggle.classList.toggle("on", tema === "dark")
-  
-  // Atualiza os botões no modal de configurações
-  document.querySelectorAll(".theme-option").forEach(opt => {
-    opt.classList.toggle("active", opt.dataset.theme === tema)
-  })
+  document.body.setAttribute("data-theme", tema); settings.theme = tema
+  const ht = document.getElementById("header-theme-toggle"); if (ht) ht.classList.toggle("on", tema === "dark")
+  document.querySelectorAll(".theme-option").forEach(o => o.classList.toggle("active", o.dataset.theme === tema))
 }
-
-async function toggleTheme() {
-  const novo = settings.theme === "light" ? "dark" : "light"
-  aplicarTema(novo)
-  await chamarAPI("salvar_tema", novo)
-}
-
-function setTheme(tema) { aplicarTema(tema) }
+async function toggleTheme() { const n = settings.theme === "light" ? "dark" : "light"; aplicarTema(n); await chamarAPI("salvar_tema", n) }
+function setTheme(tema) { aplicarTema(tema); chamarAPI("salvar_tema", tema) }
+function toggleSidebar() { document.body.classList.toggle("sidebar-collapsed") }
 
 window.addEventListener("pywebviewready", async () => {
   esconderSplash()
-  
-  // Carrega o tema salvo do backend
-  try {
-    const res = await chamarAPI("carregar_tema")
-    if (res.ok) {
-      aplicarTema(res.data.tema || "light")
-    } else {
-      aplicarTema("light")
-    }
-  } catch (e) {
-    aplicarTema("light")
-  }
-  
+  try { const r = await chamarAPI("carregar_tema"); if (r.ok) aplicarTema(r.data.tema || "light"); else aplicarTema("light") } catch (e) { aplicarTema("light") }
   criarParticulas()
-  
-  document.querySelectorAll(".nav-btn").forEach(btn => {
-    btn.addEventListener("click", () => trocarAba(btn.dataset.aba))
-  })
+  document.querySelectorAll(".nav-btn").forEach(b => b.addEventListener("click", () => trocarAba(b.dataset.aba)))
   document.getElementById("btn-nova-conversa").addEventListener("click", novaConversa)
-  document.getElementById("chat-input").addEventListener("keydown", e => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMensagem() }
-  })
+  document.getElementById("chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMensagem() } })
   document.getElementById("chat-send").addEventListener("click", enviarMensagem)
-  document.getElementById("cor-fundo").addEventListener("input", e => {
-    document.getElementById("cor-fundo-label").textContent = e.target.value
-  })
-
-  const chatMsgs = document.getElementById("chat-msgs")
-  chatMsgs.addEventListener("scroll", () => {
-    const btn = document.getElementById("scroll-bottom-btn")
-    const perto = chatMsgs.scrollHeight - chatMsgs.scrollTop - chatMsgs.clientHeight < 80
-    btn.classList.toggle("visible", !perto)
-  })
-
-  document.addEventListener("click", () => {
-    document.getElementById("context-menu").classList.remove("visible")
-  })
-
-  setupSidebarDrag()
-  document.addEventListener("keydown", handleAtalhos)
-
+  document.getElementById("cor-fundo").addEventListener("input", e => document.getElementById("cor-fundo-label").textContent = e.target.value)
+  const cm = document.getElementById("chat-msgs")
+  cm.addEventListener("scroll", () => { const b = document.getElementById("scroll-bottom-btn"); b.classList.toggle("visible", cm.scrollHeight - cm.scrollTop - cm.clientHeight > 80) })
+  document.addEventListener("click", () => document.getElementById("context-menu").classList.remove("visible"))
+  setupSidebarDrag(); document.addEventListener("keydown", handleAtalhos)
   try { await abrirUltimaConversa() } catch (e) { console.error(e) }
   try { await carregarResumoMatinal() } catch (e) { console.error(e) }
   try { await atualizarStatsFoco() } catch (e) { console.error(e) }
@@ -154,931 +60,165 @@ window.addEventListener("pywebviewready", async () => {
 
 function handleAtalhos(e) {
   if (e.ctrlKey || e.metaKey) {
-    if (e.key === "k" || e.key === "K") {
-      e.preventDefault(); novaConversa()
-      showToast("Nova conversa", "", "info", 1500)
-    } else if (e.key === "/") {
-      e.preventDefault()
-      const hint = document.getElementById("shortcut-hint")
-      hint.classList.add("visible")
-      setTimeout(() => hint.classList.remove("visible"), 2500)
-    }
+    if (e.key === "k" || e.key === "K") { e.preventDefault(); novaConversa(); showToast("Nova conversa", "", "info", 1500) }
+    else if (e.key === "/") { e.preventDefault(); const h = document.getElementById("shortcut-hint"); h.classList.add("visible"); setTimeout(() => h.classList.remove("visible"), 2500) }
+    else if (e.key === "b" || e.key === "B") { e.preventDefault(); toggleSidebar() }
   }
-  if (e.key === "Escape") {
-    document.querySelectorAll(".modal").forEach(m => m.style.display = "none")
-    document.getElementById("context-menu").classList.remove("visible")
-  }
+  if (e.key === "Escape") { document.querySelectorAll(".modal").forEach(m => m.style.display = "none"); document.getElementById("context-menu").classList.remove("visible") }
 }
-
 function setupSidebarDrag() {
-  const resizer = document.getElementById("sidebar-resizer")
-  if (!resizer) return
-  let isDragging = false
-  resizer.addEventListener("mousedown", (e) => {
-    isDragging = true
-    resizer.classList.add("dragging")
-    document.body.style.cursor = "col-resize"
-    document.body.style.userSelect = "none"
-    e.preventDefault()
-  })
-  document.addEventListener("mousemove", (e) => {
-    if (!isDragging) return
-    const novaLargura = Math.max(180, Math.min(400, e.clientX))
-    document.documentElement.style.setProperty("--sidebar-width", novaLargura + "px")
-  })
-  document.addEventListener("mouseup", () => {
-    if (isDragging) {
-      isDragging = false
-      resizer.classList.remove("dragging")
-      document.body.style.cursor = ""
-      document.body.style.userSelect = ""
-    }
-  })
+  const r = document.getElementById("sidebar-resizer"); if (!r) return; let d = false
+  r.addEventListener("mousedown", e => { d = true; r.classList.add("dragging"); document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; e.preventDefault() })
+  document.addEventListener("mousemove", e => { if (!d) return; document.documentElement.style.setProperty("--sidebar-width", Math.max(180, Math.min(400, e.clientX)) + "px") })
+  document.addEventListener("mouseup", () => { if (d) { d = false; r.classList.remove("dragging"); document.body.style.cursor = ""; document.body.style.userSelect = "" } })
 }
-
 async function atualizarBadges() {
-  try {
-    const res = await chamarAPI("get_tarefas")
-    if (res.ok) {
-      const pendentes = res.data.filter(t => t.status === "pendente").length
-      const badge = document.getElementById("badge-tarefas")
-      if (pendentes > 0) { badge.textContent = pendentes > 9 ? "9+" : pendentes; badge.style.display = "inline-block" }
-      else badge.style.display = "none"
-      const sub = document.getElementById("subtitle-tarefas")
-      if (sub) sub.textContent = `${pendentes} pendente(s) · ${res.data.length - pendentes} concluída(s)`
-    }
-  } catch (e) {}
-  try {
-    const res = await chamarAPI("get_lembretes")
-    if (res.ok) {
-      const total = res.data.length
-      const badge = document.getElementById("badge-lembretes")
-      if (total > 0) { badge.textContent = total > 9 ? "9+" : total; badge.style.display = "inline-block" }
-      else badge.style.display = "none"
-      const sub = document.getElementById("subtitle-lembretes")
-      if (sub) sub.textContent = `${total} lembrete(s) ativo(s)`
-    }
-  } catch (e) {}
-  try {
-    const res = await chamarAPI("get_habitos")
-    if (res.ok) {
-      const feitos = res.data.filter(h => h.feito_hoje).length
-      const sub = document.getElementById("subtitle-habitos")
-      if (sub) sub.textContent = `${feitos}/${res.data.length} feitos hoje`
-    }
-  } catch (e) {}
+  try { const r = await chamarAPI("get_tarefas"); if (r.ok) { const p = r.data.filter(t => t.status === "pendente").length; const b = document.getElementById("badge-tarefas"); if (p > 0) { b.textContent = p > 9 ? "9+" : p; b.style.display = "inline-block" } else b.style.display = "none"; const s = document.getElementById("subtitle-tarefas"); if (s) s.textContent = `${p} pendente(s) · ${r.data.length - p} concluída(s)` } } catch (e) {}
+  try { const r = await chamarAPI("get_lembretes"); if (r.ok) { const t = r.data.length; const b = document.getElementById("badge-lembretes"); if (t > 0) { b.textContent = t > 9 ? "9+" : t; b.style.display = "inline-block" } else b.style.display = "none"; const s = document.getElementById("subtitle-lembretes"); if (s) s.textContent = `${t} lembrete(s) ativo(s)` } } catch (e) {}
+  try { const r = await chamarAPI("get_habitos"); if (r.ok) { const f = r.data.filter(h => h.feito_hoje).length; const s = document.getElementById("subtitle-habitos"); if (s) s.textContent = `${f}/${r.data.length} feitos hoje` } } catch (e) {}
 }
-
 async function atualizarKeyDot() {
-  try {
-    const res = await chamarAPI("get_api_key")
-    const dot1 = document.getElementById("key-dot")
-    const dot2 = document.getElementById("key-dot-modal")
-    const status = document.getElementById("key-status")
-    const ok = res.ok && res.data.tem_key
-    if (dot1) dot1.classList.toggle("configured", ok)
-    if (dot2) dot2.classList.toggle("configured", ok)
-    if (status) status.textContent = ok ? "✓ Configurada e pronta" : "⚠ Não configurada"
-  } catch (e) {}
+  try { const r = await chamarAPI("get_api_key"); const ok = r.ok && r.data.tem_key; const d1 = document.getElementById("key-dot"); const d2 = document.getElementById("key-dot-modal"); const st = document.getElementById("key-status"); if (d1) d1.classList.toggle("configured", ok); if (d2) d2.classList.toggle("configured", ok); if (st) st.textContent = ok ? "✓ Configurada" : "⚠ Não configurada" } catch (e) {}
 }
-
 function trocarAba(aba) {
-  document.querySelectorAll(".aba").forEach(a => a.classList.remove("active"))
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"))
-  document.getElementById(`aba-${aba}`).classList.add("active")
-  document.querySelector(`[data-aba="${aba}"]`).classList.add("active")
-  if (aba === "tarefas")   carregarTarefas()
-  if (aba === "lembretes") carregarLembretes()
-  if (aba === "habitos")   carregarHabitos()
-  if (aba === "foco")      atualizarStatsFoco()
+  document.querySelectorAll(".aba").forEach(a => a.classList.remove("active")); document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"))
+  document.getElementById(`aba-${aba}`).classList.add("active"); document.querySelector(`[data-aba="${aba}"]`).classList.add("active")
+  if (aba === "tarefas") carregarTarefas(); if (aba === "lembretes") carregarLembretes(); if (aba === "habitos") carregarHabitos(); if (aba === "foco") atualizarStatsFoco()
 }
-
 async function abrirUltimaConversa() {
-  const res = await chamarAPI("get_sessoes")
-  if (!res.ok || !res.data || res.data.length === 0) { await novaConversa(); return }
-  const ultima = res.data[0]
-  sessaoAtual = ultima.id
-  await carregarSessoes()
-  marcarSessaoAtiva(sessaoAtual)
-  const hist = await chamarAPI("get_historico", ultima.id)
-  if (hist.ok) {
-    const msgs = document.getElementById("chat-msgs")
-    msgs.innerHTML = ""
-    hist.data.forEach(m => adicionarMensagem(m.role === "user" ? "user" : "nova", m.content))
-  }
+  const r = await chamarAPI("get_sessoes"); if (!r.ok || !r.data || !r.data.length) { await novaConversa(); return }
+  const u = r.data[0]; sessaoAtual = u.id; await carregarSessoes(); marcarSessaoAtiva(sessaoAtual)
+  const h = await chamarAPI("get_historico", u.id); if (h.ok) { const m = document.getElementById("chat-msgs"); m.innerHTML = ""; h.data.forEach(d => adicionarMensagem(d.role === "user" ? "user" : "nova", d.content)) }
 }
-
-async function novaConversa() {
-  const res = await chamarAPI("nova_sessao")
-  if (!res.ok) return
-  sessaoAtual = res.data.sessao_id
-  document.getElementById("chat-msgs").innerHTML = ""
-  await carregarSessoes()
-  marcarSessaoAtiva(sessaoAtual)
-}
-
+async function novaConversa() { const r = await chamarAPI("nova_sessao"); if (!r.ok) return; sessaoAtual = r.data.sessao_id; document.getElementById("chat-msgs").innerHTML = ""; await carregarSessoes(); marcarSessaoAtiva(sessaoAtual) }
 async function carregarSessoes() {
-  const res = await chamarAPI("get_sessoes")
-  if (!res.ok) return
-  const lista = document.getElementById("lista-sessoes")
-  lista.innerHTML = ""
-  res.data.forEach(s => {
-    const f = document.createElement("div")
-    f.className = "sessao-item" + (s.id === sessaoAtual ? " ativa" : "")
-    f.dataset.id = s.id
-    f.innerHTML = `<span class="sessao-titulo">💬 ${escapeHTML(s.titulo)}</span><button class="sessao-del" onclick="deletarSessao(${s.id}, event)">✕</button>`
-    f.addEventListener("click", () => abrirSessao(s.id))
-    lista.appendChild(f)
-  })
+  const r = await chamarAPI("get_sessoes"); if (!r.ok) return; const l = document.getElementById("lista-sessoes"); l.innerHTML = ""
+  r.data.forEach(s => { const f = document.createElement("div"); f.className = "sessao-item" + (s.id === sessaoAtual ? " ativa" : ""); f.dataset.id = s.id; f.innerHTML = `<span class="sessao-titulo">${escapeHTML(s.titulo)}</span><button class="sessao-del" onclick="deletarSessao(${s.id}, event)">✕</button>`; f.addEventListener("click", () => abrirSessao(s.id)); l.appendChild(f) })
 }
-
-function marcarSessaoAtiva(id) {
-  document.querySelectorAll(".sessao-item").forEach(el => {
-    el.classList.toggle("ativa", parseInt(el.dataset.id) === id)
-  })
-}
-
-async function abrirSessao(id) {
-  sessaoAtual = id
-  marcarSessaoAtiva(id)
-  trocarAba("chat")
-  const res = await chamarAPI("get_historico", id)
-  if (!res.ok) return
-  const msgs = document.getElementById("chat-msgs")
-  msgs.innerHTML = ""
-  res.data.forEach(m => adicionarMensagem(m.role === "user" ? "user" : "nova", m.content))
-}
-
-async function deletarSessao(id, e) {
-  e.stopPropagation()
-  await chamarAPI("deletar_sessao", id)
-  if (sessaoAtual === id) {
-    const res = await chamarAPI("get_sessoes")
-    if (res.ok && res.data.length > 0) await abrirSessao(res.data[0].id)
-    else await novaConversa()
-  } else await carregarSessoes()
-}
-
-async function carregarResumoMatinal() {
-  const res = await chamarAPI("get_resumo_matinal")
-  if (!res.ok) return
-  adicionarMensagem("nova", res.data.resumo, "resumo")
-}
-
+function marcarSessaoAtiva(id) { document.querySelectorAll(".sessao-item").forEach(e => e.classList.toggle("ativa", parseInt(e.dataset.id) === id)) }
+async function abrirSessao(id) { sessaoAtual = id; marcarSessaoAtiva(id); trocarAba("chat"); const r = await chamarAPI("get_historico", id); if (!r.ok) return; const m = document.getElementById("chat-msgs"); m.innerHTML = ""; r.data.forEach(d => adicionarMensagem(d.role === "user" ? "user" : "nova", d.content)) }
+async function deletarSessao(id, e) { e.stopPropagation(); await chamarAPI("deletar_sessao", id); if (sessaoAtual === id) { const r = await chamarAPI("get_sessoes"); if (r.ok && r.data.length > 0) await abrirSessao(r.data[0].id); else await novaConversa() } else await carregarSessoes() }
+async function carregarResumoMatinal() { const r = await chamarAPI("get_resumo_matinal"); if (!r.ok) return; adicionarMensagem("nova", r.data.resumo, "resumo") }
 function adicionarMensagem(tipo, texto, extraClass = "") {
-  const msgs = document.getElementById("chat-msgs")
-  const div = document.createElement("div")
-  div.className = `msg ${tipo}${extraClass ? " " + extraClass : ""}`
-  const hora = agoraHora()
-
+  const msgs = document.getElementById("chat-msgs"); const div = document.createElement("div"); div.className = `msg ${tipo}${extraClass ? " " + extraClass : ""}`; const hora = agoraHora()
   if (tipo === "nova") {
     const isResumo = extraClass === "resumo"
-    div.innerHTML = `
-      <div class="msg-avatar">N</div>
-      <div class="msg-content">
-        <div class="bubble ${isResumo ? "" : "markdown"}">${isResumo ? escapeHTML(texto).replace(/\n/g, "<br>") : renderMarkdown(texto)}</div>
-        <div class="msg-meta">${hora}</div>
-        ${!isResumo ? `
-          <div class="msg-actions">
-            <button class="msg-action-btn" onclick="copiarMensagem(this)" title="Copiar">
-              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              Copiar
-            </button>
-            <button class="msg-action-btn" onclick="regenerarMensagem(this)" title="Regenerar">
-              <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              Regenerar
-            </button>
-          </div>
-        ` : ""}
-      </div>
-    `
+    div.innerHTML = `<div class="msg-avatar">N</div><div class="msg-content"><div class="bubble ${isResumo ? "" : "markdown"}">${isResumo ? escapeHTML(texto).replace(/\n/g, "<br>") : renderMarkdown(texto)}</div><div class="msg-meta">${hora}</div>${!isResumo ? `<div class="msg-actions"><button class="msg-action-btn" onclick="copiarMensagem(this)" title="Copiar"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</button><button class="msg-action-btn" onclick="regenerarMensagem(this)" title="Regenerar"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</button></div>` : ""}</div>`
     if (!extraClass) { div.classList.add("nova-flash"); ultimaMsgNova = div }
-    div.querySelector(".bubble").addEventListener("contextmenu", (e) => {
-      e.preventDefault()
-      contextMsgEl = div
-      mostrarContextMenu(e.clientX, e.clientY)
-    })
+    div.querySelector(".bubble").addEventListener("contextmenu", e => { e.preventDefault(); contextMsgEl = div; mostrarContextMenu(e.clientX, e.clientY) })
   } else if (tipo === "user") {
-    div.innerHTML = `
-      <div class="msg-content">
-        <div class="bubble">${escapeHTML(texto).replace(/\n/g, "<br>")}</div>
-        <div class="msg-meta">${hora}</div>
-      </div>
-    `
-  } else {
-    div.innerHTML = `<div class="bubble">${escapeHTML(texto).replace(/\n/g, "<br>")}</div>`
-    div.classList.add("muted")
-  }
-
-  msgs.appendChild(div)
-  msgs.scrollTop = msgs.scrollHeight
-  return div
+    div.innerHTML = `<div class="msg-content"><div class="bubble">${escapeHTML(texto).replace(/\n/g, "<br>")}</div><div class="msg-meta">${hora}</div></div>`
+  } else { div.innerHTML = `<div class="bubble">${escapeHTML(texto).replace(/\n/g, "<br>")}</div>`; div.classList.add("muted") }
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight; return div
 }
-
-function adicionarMensagemImagem(texto, base64Img) {
-  const msgs = document.getElementById("chat-msgs")
-  const div = document.createElement("div")
-  div.className = "msg nova nova-flash"
-  const hora = agoraHora()
-  div.innerHTML = `
-    <div class="msg-avatar">N</div>
-    <div class="msg-content">
-      <div class="bubble" style="padding:8px">
-        <img src="${base64Img}" style="max-width:260px; max-height:260px; border-radius:8px; display:block; margin-bottom:6px"/>
-        <span>${escapeHTML(texto)}</span>
-      </div>
-      <div class="msg-meta">${hora}</div>
-    </div>
-  `
-  msgs.appendChild(div)
-  msgs.scrollTop = msgs.scrollHeight
-  return div
-}
-
-function copiarMensagem(btn) {
-  const bubble = btn.closest(".msg-content").querySelector(".bubble")
-  const texto = bubble.innerText
-  navigator.clipboard.writeText(texto).then(() => {
-    showToast("Copiado!", "Mensagem copiada pra área de transferência", "success", 1800)
-  }).catch(() => showToast("Erro ao copiar", "", "error", 2000))
-}
-
-function regenerarMensagem(btn) {
-  const msgNova = btn.closest(".msg")
-  let prev = msgNova.previousElementSibling
-  while (prev && !prev.classList.contains("user")) prev = prev.previousElementSibling
-  if (!prev) return
-  const texto = prev.querySelector(".bubble").innerText
-  msgNova.remove()
-  reenviarSemMostrar(texto)
-}
-
+function adicionarMensagemImagem(texto, base64Img) { const m = document.getElementById("chat-msgs"); const d = document.createElement("div"); d.className = "msg nova nova-flash"; d.innerHTML = `<div class="msg-avatar">N</div><div class="msg-content"><div class="bubble" style="padding:8px"><img src="${base64Img}" style="max-width:260px;max-height:260px;border-radius:8px;display:block;margin-bottom:6px"/><span>${escapeHTML(texto)}</span></div><div class="msg-meta">${agoraHora()}</div></div>`; m.appendChild(d); m.scrollTop = m.scrollHeight }
+function copiarMensagem(btn) { const b = btn.closest(".msg-content").querySelector(".bubble"); navigator.clipboard.writeText(b.innerText).then(() => showToast("Copiado!", "", "success", 1800)).catch(() => showToast("Erro", "", "error", 2000)) }
+function regenerarMensagem(btn) { const m = btn.closest(".msg"); let p = m.previousElementSibling; while (p && !p.classList.contains("user")) p = p.previousElementSibling; if (!p) return; const t = p.querySelector(".bubble").innerText; m.remove(); reenviarSemMostrar(t) }
 async function reenviarSemMostrar(texto) {
-  const btn = document.getElementById("chat-send")
-  btn.disabled = true
-  adicionarTyping()
-  let streamingDiv = null
-
-  window.__novaPrimeiroChunk = function() {
-    removerTyping()
-    if (streamingDiv) return
-    const msgs = document.getElementById("chat-msgs")
-    streamingDiv = document.createElement("div")
-    streamingDiv.className = "msg nova nova-flash"
-    const hora = agoraHora()
-    streamingDiv.innerHTML = `
-      <div class="msg-avatar">N</div>
-      <div class="msg-content">
-        <div class="bubble markdown" id="streaming-bubble"><span class="streaming-cursor">▍</span></div>
-        <div class="msg-meta">${hora}</div>
-        <div class="msg-actions">
-          <button class="msg-action-btn" onclick="copiarMensagem(this)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</button>
-          <button class="msg-action-btn" onclick="regenerarMensagem(this)"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</button>
-        </div>
-      </div>
-    `
-    msgs.appendChild(streamingDiv)
-    msgs.scrollTop = msgs.scrollHeight
-  }
-
-  await chamarAPI("enviar_mensagem_stream", sessaoAtual, texto)
-  btn.disabled = false
-  removerTyping()
-  const bubble = document.getElementById("streaming-bubble")
-  if (bubble) {
-    bubble.removeAttribute("id")
-    const cursor = bubble.querySelector(".streaming-cursor")
-    if (cursor) cursor.remove()
-  }
-  await carregarSessoes()
-  marcarSessaoAtiva(sessaoAtual)
+  const btn = document.getElementById("chat-send"); btn.disabled = true; adicionarTyping(); let sd = null
+  window.__novaPrimeiroChunk = function() { removerTyping(); if (sd) return; const m = document.getElementById("chat-msgs"); sd = document.createElement("div"); sd.className = "msg nova nova-flash"; sd.innerHTML = `<div class="msg-avatar">N</div><div class="msg-content"><div class="bubble markdown" id="streaming-bubble"><span class="streaming-cursor">▍</span></div><div class="msg-meta">${agoraHora()}</div><div class="msg-actions"><button class="msg-action-btn" onclick="copiarMensagem(this)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</button><button class="msg-action-btn" onclick="regenerarMensagem(this)"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</button></div></div>`; m.appendChild(sd); m.scrollTop = m.scrollHeight }
+  await chamarAPI("enviar_mensagem_stream", sessaoAtual, texto); btn.disabled = false; removerTyping()
+  const b = document.getElementById("streaming-bubble"); if (b) { b.removeAttribute("id"); const c = b.querySelector(".streaming-cursor"); if (c) c.remove() }
+  await carregarSessoes(); marcarSessaoAtiva(sessaoAtual)
 }
-
-function mostrarContextMenu(x, y) {
-  const menu = document.getElementById("context-menu")
-  menu.style.left = x + "px"
-  menu.style.top = y + "px"
-  menu.classList.add("visible")
-}
-
-function ctxCopy() {
-  if (!contextMsgEl) return
-  const bubble = contextMsgEl.querySelector(".bubble")
-  if (bubble) { navigator.clipboard.writeText(bubble.innerText); showToast("Copiado!", "", "success", 1500) }
-  document.getElementById("context-menu").classList.remove("visible")
-}
-
-function ctxRegenerate() {
-  if (!contextMsgEl) return
-  const btn = contextMsgEl.querySelector(".msg-action-btn[title='Regenerar']")
-  if (btn) regenerarMensagem(btn)
-  document.getElementById("context-menu").classList.remove("visible")
-}
-
-function ctxDelete() {
-  if (!contextMsgEl) return
-  contextMsgEl.remove()
-  showToast("Mensagem removida", "", "info", 1500)
-  document.getElementById("context-menu").classList.remove("visible")
-}
-
+function mostrarContextMenu(x, y) { const m = document.getElementById("context-menu"); m.style.left = x + "px"; m.style.top = y + "px"; m.classList.add("visible") }
+function ctxCopy() { if (!contextMsgEl) return; const b = contextMsgEl.querySelector(".bubble"); if (b) { navigator.clipboard.writeText(b.innerText); showToast("Copiado!", "", "success", 1500) } document.getElementById("context-menu").classList.remove("visible") }
+function ctxRegenerate() { if (!contextMsgEl) return; const b = contextMsgEl.querySelector(".msg-action-btn[title='Regenerar']"); if (b) regenerarMensagem(b); document.getElementById("context-menu").classList.remove("visible") }
+function ctxDelete() { if (!contextMsgEl) return; contextMsgEl.remove(); showToast("Removida", "", "info", 1500); document.getElementById("context-menu").classList.remove("visible") }
 let imagemChatB64 = null
-
-function previewImagem(event) {
-  const file = event.target.files[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = e => {
-    imagemChatB64 = e.target.result
-    document.getElementById("chat-preview-img").src = imagemChatB64
-    document.getElementById("chat-preview-wrap").style.display = "flex"
-  }
-  reader.readAsDataURL(file)
-}
-
-function removerImagem() {
-  imagemChatB64 = null
-  document.getElementById("chat-preview-wrap").style.display = "none"
-  document.getElementById("chat-preview-img").src = ""
-  document.getElementById("chat-imagem").value = ""
-}
-
-function scrollChatBottom() {
-  const msgs = document.getElementById("chat-msgs")
-  msgs.scrollTop = msgs.scrollHeight
-  document.getElementById("scroll-bottom-btn").classList.remove("visible")
-}
-
-function adicionarTyping() {
-  const msgs = document.getElementById("chat-msgs")
-  const div = document.createElement("div")
-  div.className = "msg nova"
-  div.id = "typing-msg"
-  div.innerHTML = `<div class="msg-avatar">N</div><div class="bubble" style="padding:0"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`
-  msgs.appendChild(div)
-  msgs.scrollTop = msgs.scrollHeight
-}
-
-function removerTyping() {
-  const t = document.getElementById("typing-msg")
-  if (t) t.remove()
-}
-
+function previewImagem(e) { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { imagemChatB64 = ev.target.result; document.getElementById("chat-preview-img").src = imagemChatB64; document.getElementById("chat-preview-wrap").style.display = "flex" }; r.readAsDataURL(f) }
+function removerImagem() { imagemChatB64 = null; document.getElementById("chat-preview-wrap").style.display = "none"; document.getElementById("chat-preview-img").src = ""; document.getElementById("chat-imagem").value = "" }
+function scrollChatBottom() { const m = document.getElementById("chat-msgs"); m.scrollTop = m.scrollHeight; document.getElementById("scroll-bottom-btn").classList.remove("visible") }
+function adicionarTyping() { const m = document.getElementById("chat-msgs"); const d = document.createElement("div"); d.className = "msg nova"; d.id = "typing-msg"; d.innerHTML = `<div class="msg-avatar">N</div><div class="bubble" style="padding:0"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`; m.appendChild(d); m.scrollTop = m.scrollHeight }
+function removerTyping() { const t = document.getElementById("typing-msg"); if (t) t.remove() }
 function showProgressBar() { document.getElementById("chat-progress-bar").classList.add("active") }
 function hideProgressBar() { document.getElementById("chat-progress-bar").classList.remove("active") }
-
 async function enviarMensagem() {
-  const input = document.getElementById("chat-input")
-  const texto = input.value.trim()
-  const imagemEnviada = imagemChatB64
-  if (!texto && !imagemEnviada) return
-  if (!sessaoAtual) return
-
-  input.value = ""
-  input.style.height = "auto"
-
-  if (imagemEnviada) {
-    const msgs = document.getElementById("chat-msgs")
-    const div = document.createElement("div")
-    div.className = "msg user"
-    const hora = agoraHora()
-    div.innerHTML = `
-      <div class="msg-content">
-        <div class="bubble" style="padding:6px">
-          <img src="${imagemEnviada}" style="max-width:200px; max-height:200px; border-radius:8px; display:block"/>
-          ${texto ? `<span style="display:block; margin-top:6px">${escapeHTML(texto)}</span>` : ""}
-        </div>
-        <div class="msg-meta">${hora}</div>
-      </div>
-    `
-    msgs.appendChild(div)
-    msgs.scrollTop = msgs.scrollHeight
-  } else adicionarMensagem("user", texto)
-
-  removerImagem()
-  const btn = document.getElementById("chat-send")
-  btn.disabled = true
-  showProgressBar()
-
-  if (imagemEnviada) {
-    adicionarTyping()
-    const res = await chamarAPI("chat_imagem", sessaoAtual, texto, imagemEnviada)
-    removerTyping(); btn.disabled = false; hideProgressBar()
-    if (res.ok) {
-      if (res.data.tipo === "imagem") adicionarMensagemImagem(res.data.resposta, res.data.imagem_base64)
-      else adicionarMensagem("nova", res.data.resposta)
-      await carregarSessoes(); marcarSessaoAtiva(sessaoAtual)
-    } else { adicionarMensagem("nova", `❌ ${res.erro}`); showToast("Erro", res.erro, "error") }
-    return
-  }
-
-  adicionarTyping()
-  let streamingDiv = null
-
-  window.__novaPrimeiroChunk = function() {
-    removerTyping(); hideProgressBar()
-    if (streamingDiv) return
-    const msgs = document.getElementById("chat-msgs")
-    streamingDiv = document.createElement("div")
-    streamingDiv.className = "msg nova nova-flash"
-    const hora = agoraHora()
-    streamingDiv.innerHTML = `
-      <div class="msg-avatar">N</div>
-      <div class="msg-content">
-        <div class="bubble markdown" id="streaming-bubble"><span class="streaming-cursor">▍</span></div>
-        <div class="msg-meta">${hora}</div>
-        <div class="msg-actions">
-          <button class="msg-action-btn" onclick="copiarMensagem(this)" title="Copiar"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</button>
-          <button class="msg-action-btn" onclick="regenerarMensagem(this)" title="Regenerar"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</button>
-        </div>
-      </div>
-    `
-    msgs.appendChild(streamingDiv)
-    msgs.scrollTop = msgs.scrollHeight
-    ultimaMsgNova = streamingDiv
-  }
-
-  const res = await chamarAPI("enviar_mensagem_stream", sessaoAtual, texto)
-  btn.disabled = false; removerTyping(); hideProgressBar()
-
-  const bubble = document.getElementById("streaming-bubble")
-  if (bubble) {
-    bubble.removeAttribute("id")
-    const cursor = bubble.querySelector(".streaming-cursor")
-    if (cursor) cursor.remove()
-  } else if (!res.ok) {
-    adicionarMensagem("nova", `❌ ${res.erro}`)
-    showToast("Erro", res.erro, "error")
-  }
-
-  await carregarSessoes()
-  marcarSessaoAtiva(sessaoAtual)
+  const input = document.getElementById("chat-input"); const texto = input.value.trim(); const img = imagemChatB64
+  if (!texto && !img) return; if (!sessaoAtual) return
+  input.value = ""; input.style.height = "auto"
+  if (img) { const m = document.getElementById("chat-msgs"); const d = document.createElement("div"); d.className = "msg user"; d.innerHTML = `<div class="msg-content"><div class="bubble" style="padding:6px"><img src="${img}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"/>${texto ? `<span style="display:block;margin-top:6px">${escapeHTML(texto)}</span>` : ""}</div><div class="msg-meta">${agoraHora()}</div></div>`; m.appendChild(d); m.scrollTop = m.scrollHeight } else adicionarMensagem("user", texto)
+  removerImagem(); const btn = document.getElementById("chat-send"); btn.disabled = true; showProgressBar()
+  if (img) { adicionarTyping(); const r = await chamarAPI("chat_imagem", sessaoAtual, texto, img); removerTyping(); btn.disabled = false; hideProgressBar(); if (r.ok) { if (r.data.tipo === "imagem") adicionarMensagemImagem(r.data.resposta, r.data.imagem_base64); else adicionarMensagem("nova", r.data.resposta); await carregarSessoes(); marcarSessaoAtiva(sessaoAtual) } else { adicionarMensagem("nova", `❌ ${r.erro}`); showToast("Erro", r.erro, "error") } return }
+  adicionarTyping(); let sd = null
+  window.__novaPrimeiroChunk = function() { removerTyping(); hideProgressBar(); if (sd) return; const m = document.getElementById("chat-msgs"); sd = document.createElement("div"); sd.className = "msg nova nova-flash"; sd.innerHTML = `<div class="msg-avatar">N</div><div class="msg-content"><div class="bubble markdown" id="streaming-bubble"><span class="streaming-cursor">▍</span></div><div class="msg-meta">${agoraHora()}</div><div class="msg-actions"><button class="msg-action-btn" onclick="copiarMensagem(this)" title="Copiar"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</button><button class="msg-action-btn" onclick="regenerarMensagem(this)" title="Regenerar"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</button></div></div>`; m.appendChild(sd); m.scrollTop = m.scrollHeight; ultimaMsgNova = sd }
+  const res = await chamarAPI("enviar_mensagem_stream", sessaoAtual, texto); btn.disabled = false; removerTyping(); hideProgressBar()
+  const b = document.getElementById("streaming-bubble"); if (b) { b.removeAttribute("id"); const c = b.querySelector(".streaming-cursor"); if (c) c.remove() } else if (!res.ok) { adicionarMensagem("nova", `❌ ${res.erro}`); showToast("Erro", res.erro, "error") }
+  await carregarSessoes(); marcarSessaoAtiva(sessaoAtual)
 }
-
-window.__novaChunk = function(texto) {
-  if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk()
-  const bubble = document.getElementById("streaming-bubble")
-  if (!bubble) return
-  const cursor = bubble.querySelector(".streaming-cursor")
-  if (cursor) cursor.remove()
-  bubble.appendChild(document.createTextNode(texto))
-  if (cursor) bubble.appendChild(cursor)
-  const msgs = document.getElementById("chat-msgs")
-  const perto = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 100
-  if (perto) msgs.scrollTop = msgs.scrollHeight
-}
-
-window.__novaFim = function() {
-  const bubble = document.getElementById("streaming-bubble")
-  if (!bubble) return
-  bubble.removeAttribute("id")
-  const cursor = bubble.querySelector(".streaming-cursor")
-  if (cursor) cursor.remove()
-}
-
-window.__novaErro = function(msg) {
-  if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk()
-  const bubble = document.getElementById("streaming-bubble")
-  if (!bubble) return
-  bubble.removeAttribute("id")
-  bubble.textContent = `❌ ${msg}`
-  showToast("Erro", msg, "error")
-}
-
-window.__novaAgenteAcao = function(tipo, descricao) {
-  const icones = { tarefa: "✅", lembrete: "⏰", listar: "📋" }
-  showToast(`${icones[tipo] || "✨"} Ação executada`, descricao, "success", 3000)
-  atualizarBadges()
-}
-
-function abrirModalConfig() {
-  document.getElementById("modal-config").style.display = "flex"
-  atualizarKeyDot()
-}
-
-function toggleSetting(key, el) {
-  el.classList.toggle("on")
-  settings[key] = el.classList.contains("on")
-  if (key === "particles") criarParticulas()
-}
-
-async function salvarConfig() {
-  const key = document.getElementById("input-key").value.trim()
-  if (key) {
-    await chamarAPI("salvar_api_key", key)
-    showToast("API Key salva!", "", "success", 2000)
-  }
-  fecharModal("modal-config")
-  await atualizarKeyDot()
-}
-
-function mostrarSkeleton(lista, n = 3) {
-  lista.innerHTML = ""
-  for (let i = 0; i < n; i++) {
-    const sk = document.createElement("div")
-    sk.className = "skeleton-card"
-    sk.innerHTML = `<div style="flex:1"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>`
-    lista.appendChild(sk)
-  }
-}
-
+window.__novaChunk = function(texto) { if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk(); const b = document.getElementById("streaming-bubble"); if (!b) return; const c = b.querySelector(".streaming-cursor"); if (c) c.remove(); b.appendChild(document.createTextNode(texto)); if (c) b.appendChild(c); const m = document.getElementById("chat-msgs"); if (m.scrollHeight - m.scrollTop - m.clientHeight < 100) m.scrollTop = m.scrollHeight }
+window.__novaFim = function() { const b = document.getElementById("streaming-bubble"); if (!b) return; b.removeAttribute("id"); const c = b.querySelector(".streaming-cursor"); if (c) c.remove() }
+window.__novaErro = function(msg) { if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk(); const b = document.getElementById("streaming-bubble"); if (!b) return; b.removeAttribute("id"); b.textContent = `❌ ${msg}`; showToast("Erro", msg, "error") }
+window.__novaAgenteAcao = function(tipo, desc) { const ic = { tarefa: "✅", lembrete: "⏰", listar: "📋" }; showToast(`${ic[tipo] || "✨"} Ação executada`, desc, "success", 3000); atualizarBadges() }
+function abrirModalConfig() { document.getElementById("modal-config").style.display = "flex"; atualizarKeyDot() }
+function toggleSetting(key, el) { el.classList.toggle("on"); settings[key] = el.classList.contains("on"); if (key === "particles") criarParticulas() }
+async function salvarConfig() { const k = document.getElementById("input-key").value.trim(); if (k) { await chamarAPI("salvar_api_key", k); showToast("API Key salva!", "", "success", 2000) } fecharModal("modal-config"); await atualizarKeyDot() }
+function mostrarSkeleton(lista, n = 3) { lista.innerHTML = ""; for (let i = 0; i < n; i++) { const s = document.createElement("div"); s.className = "skeleton-card"; s.innerHTML = `<div style="flex:1"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>`; lista.appendChild(s) } }
 async function carregarTarefas() {
-  const lista = document.getElementById("lista-tarefas")
-  mostrarSkeleton(lista)
-  const res = await chamarAPI("get_tarefas")
-  if (!res.ok) { lista.innerHTML = ""; return }
-  lista.innerHTML = ""
-  const pendentes = res.data.filter(t => t.status === "pendente")
-  const concluidas = res.data.filter(t => t.status === "concluida")
-  if (!res.data.length) {
-    lista.innerHTML = `<div class="empty-msg"><div class="empty-icon">✅</div><div class="empty-title">Sem tarefas</div><div class="empty-desc">Nenhuma tarefa ainda. Que tal criar uma?</div></div>`
-    return
-  }
-  if (pendentes.length) {
-    lista.innerHTML += `<div class="secao-label">PENDENTES</div>`
-    pendentes.forEach((t, i) => {
-      const card = cardTarefa(t)
-      if (i === 0) card.classList.add("slide-in")
-      lista.appendChild(card)
-    })
-  }
-  if (concluidas.length) {
-    lista.innerHTML += `<div class="secao-label">CONCLUÍDAS</div>`
-    concluidas.slice(0, 5).forEach(t => lista.appendChild(cardTarefa(t, true)))
-  }
+  const l = document.getElementById("lista-tarefas"); mostrarSkeleton(l); const r = await chamarAPI("get_tarefas"); if (!r.ok) { l.innerHTML = ""; return }
+  l.innerHTML = ""; const p = r.data.filter(t => t.status === "pendente"); const c = r.data.filter(t => t.status === "concluida")
+  if (!r.data.length) { l.innerHTML = `<div class="empty-msg"><div class="empty-icon">✅</div><div class="empty-title">Sem tarefas</div><div class="empty-desc">Nenhuma tarefa ainda.</div></div>`; return }
+  if (p.length) { l.innerHTML += `<div class="secao-label">PENDENTES</div>`; p.forEach((t, i) => { const cd = cardTarefa(t); if (i === 0) cd.classList.add("slide-in"); l.appendChild(cd) }) }
+  if (c.length) { l.innerHTML += `<div class="secao-label">CONCLUÍDAS</div>`; c.slice(0, 5).forEach(t => l.appendChild(cardTarefa(t, true))) }
 }
-
-function cardTarefa(t, concluida = false) {
-  const cores = { alta: "#dc2626", media: "#d97706", baixa: "#059669" }
-  const cor = cores[t.prioridade] || "#a1a29e"
-  const div = document.createElement("div")
-  div.className = "card"
-  div.innerHTML = `
-    <div class="prio-bar" style="background:${cor}"></div>
-    <div class="card-left">
-      <div class="card-titulo ${concluida ? "concluida" : ""}">${escapeHTML(t.titulo)}</div>
-      <div class="card-meta">
-        ${t.projeto ? `<span style="color:${t.cor_projeto||'#7a7890'}">[${t.projeto}]</span>` : ""}
-        ${t.prazo ? `<span>📅 ${t.prazo.slice(0,10)}</span>` : ""}
-        <span>${t.prioridade}</span>
-      </div>
-    </div>
-    <div class="card-btns">
-      ${!concluida ? `<button class="btn-icon" onclick="concluirTarefa(${t.id})">✓</button>` : ""}
-      <button class="btn-icon" onclick="deletarTarefa(${t.id})">✕</button>
-    </div>
-  `
-  return div
-}
-
-function abrirModalTarefa() {
-  document.getElementById("modal-tarefa").style.display = "flex"
-  document.getElementById("tarefa-titulo").focus()
-}
-
-async function criarTarefa() {
-  const titulo = document.getElementById("tarefa-titulo").value.trim()
-  const desc = document.getElementById("tarefa-desc").value.trim()
-  const prazo = document.getElementById("tarefa-prazo").value || null
-  const prioridade = document.querySelector('input[name="prio"]:checked')?.value || "media"
-  if (!titulo) return
-  await chamarAPI("criar_tarefa", titulo, desc, null, prioridade, prazo)
-  fecharModal("modal-tarefa")
-  document.getElementById("tarefa-titulo").value = ""
-  document.getElementById("tarefa-desc").value = ""
-  document.getElementById("tarefa-prazo").value = ""
-  await carregarTarefas()
-  await atualizarBadges()
-  showToast("Tarefa criada!", titulo, "success", 2500)
-}
-
-async function concluirTarefa(id) {
-  await chamarAPI("concluir_tarefa", id)
-  await carregarTarefas()
-  await atualizarBadges()
-  showToast("Tarefa concluída!", "Boa, chefe! 👏", "success", 2200)
-}
-
-async function deletarTarefa(id) {
-  await chamarAPI("deletar_tarefa", id)
-  await carregarTarefas()
-  await atualizarBadges()
-}
-
+function cardTarefa(t, c = false) { const co = { alta: "#dc2626", media: "#d97706", baixa: "#059669" }; const cor = co[t.prioridade] || "#a1a29e"; const d = document.createElement("div"); d.className = "card"; d.innerHTML = `<div class="prio-bar" style="background:${cor}"></div><div class="card-left"><div class="card-titulo ${c ? "concluida" : ""}">${escapeHTML(t.titulo)}</div><div class="card-meta">${t.projeto ? `<span>[${t.projeto}]</span>` : ""}${t.prazo ? `<span>📅 ${t.prazo.slice(0,10)}</span>` : ""}<span>${t.prioridade}</span></div></div><div class="card-btns">${!c ? `<button class="btn-icon" onclick="concluirTarefa(${t.id})">✓</button>` : ""}<button class="btn-icon" onclick="deletarTarefa(${t.id})">✕</button></div>`; return d }
+function abrirModalTarefa() { document.getElementById("modal-tarefa").style.display = "flex"; document.getElementById("tarefa-titulo").focus() }
+async function criarTarefa() { const t = document.getElementById("tarefa-titulo").value.trim(); const d = document.getElementById("tarefa-desc").value.trim(); const p = document.getElementById("tarefa-prazo").value || null; const pr = document.querySelector('input[name="prio"]:checked')?.value || "media"; if (!t) return; await chamarAPI("criar_tarefa", t, d, null, pr, p); fecharModal("modal-tarefa"); document.getElementById("tarefa-titulo").value = ""; document.getElementById("tarefa-desc").value = ""; document.getElementById("tarefa-prazo").value = ""; await carregarTarefas(); await atualizarBadges(); showToast("Tarefa criada!", t, "success", 2500) }
+async function concluirTarefa(id) { await chamarAPI("concluir_tarefa", id); await carregarTarefas(); await atualizarBadges(); showToast("Concluída!", "👏", "success", 2200) }
+async function deletarTarefa(id) { await chamarAPI("deletar_tarefa", id); await carregarTarefas(); await atualizarBadges() }
 async function carregarLembretes() {
-  const lista = document.getElementById("lista-lembretes")
-  mostrarSkeleton(lista)
-  const res = await chamarAPI("get_lembretes")
-  if (!res.ok) { lista.innerHTML = ""; return }
-  lista.innerHTML = ""
-  if (!res.data.length) {
-    lista.innerHTML = `<div class="empty-msg"><div class="empty-icon">⏰</div><div class="empty-title">Sem lembretes</div><div class="empty-desc">Nenhum lembrete ativo no momento.</div></div>`
-    return
-  }
-  res.data.forEach(l => {
-    const div = document.createElement("div")
-    div.className = "card"
-    const data = l.data_hora.slice(0,16).replace("T"," ")
-    const rep = l.repetir !== "nunca" ? ` • repete ${l.repetir}` : ""
-    div.innerHTML = `
-      <div class="card-left">
-        <div class="card-titulo">⏰ ${escapeHTML(l.titulo)}</div>
-        <div class="card-meta"><span>${data}${rep}</span></div>
-      </div>
-      <div class="card-btns"><button class="btn-icon" onclick="deletarLembrete(${l.id})">✕</button></div>
-    `
-    lista.appendChild(div)
-  })
+  const l = document.getElementById("lista-lembretes"); mostrarSkeleton(l); const r = await chamarAPI("get_lembretes"); if (!r.ok) { l.innerHTML = ""; return }
+  l.innerHTML = ""; if (!r.data.length) { l.innerHTML = `<div class="empty-msg"><div class="empty-icon">⏰</div><div class="empty-title">Sem lembretes</div><div class="empty-desc">Nenhum ativo.</div></div>`; return }
+  r.data.forEach(lb => { const d = document.createElement("div"); d.className = "card"; const dt = lb.data_hora.slice(0,16).replace("T"," "); const rp = lb.repetir !== "nunca" ? ` • repete ${lb.repetir}` : ""; d.innerHTML = `<div class="card-left"><div class="card-titulo">⏰ ${escapeHTML(lb.titulo)}</div><div class="card-meta"><span>${dt}${rp}</span></div></div><div class="card-btns"><button class="btn-icon" onclick="deletarLembrete(${lb.id})">✕</button></div>`; l.appendChild(d) })
 }
-
-function abrirModalLembrete() {
-  const agora = new Date()
-  agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
-  document.getElementById("lembrete-data").value = agora.toISOString().slice(0,16)
-  document.getElementById("modal-lembrete").style.display = "flex"
-  document.getElementById("lembrete-titulo").focus()
-}
-
-async function criarLembrete() {
-  const titulo = document.getElementById("lembrete-titulo").value.trim()
-  const dataHora = document.getElementById("lembrete-data").value
-  const repetir = document.querySelector('input[name="rep"]:checked')?.value || "nunca"
-  if (!titulo || !dataHora) return
-  await chamarAPI("criar_lembrete", titulo, dataHora, "", repetir)
-  fecharModal("modal-lembrete")
-  document.getElementById("lembrete-titulo").value = ""
-  await carregarLembretes()
-  await atualizarBadges()
-  showToast("Lembrete criado!", titulo, "success", 2500)
-}
-
-async function deletarLembrete(id) {
-  await chamarAPI("deletar_lembrete", id)
-  await carregarLembretes()
-  await atualizarBadges()
-}
-
+function abrirModalLembrete() { const a = new Date(); a.setMinutes(a.getMinutes() - a.getTimezoneOffset()); document.getElementById("lembrete-data").value = a.toISOString().slice(0,16); document.getElementById("modal-lembrete").style.display = "flex"; document.getElementById("lembrete-titulo").focus() }
+async function criarLembrete() { const t = document.getElementById("lembrete-titulo").value.trim(); const d = document.getElementById("lembrete-data").value; const r = document.querySelector('input[name="rep"]:checked')?.value || "nunca"; if (!t || !d) return; await chamarAPI("criar_lembrete", t, d, "", r); fecharModal("modal-lembrete"); document.getElementById("lembrete-titulo").value = ""; await carregarLembretes(); await atualizarBadges(); showToast("Lembrete criado!", t, "success", 2500) }
+async function deletarLembrete(id) { await chamarAPI("deletar_lembrete", id); await carregarLembretes(); await atualizarBadges() }
 async function carregarHabitos() {
-  const lista = document.getElementById("lista-habitos")
-  mostrarSkeleton(lista)
-  const res = await chamarAPI("get_habitos")
-  if (!res.ok) { lista.innerHTML = ""; return }
-  lista.innerHTML = ""
-  if (!res.data.length) {
-    lista.innerHTML = `<div class="empty-msg"><div class="empty-icon">📊</div><div class="empty-title">Sem hábitos</div><div class="empty-desc">Nenhum hábito ainda. Crie um pra começar!</div></div>`
-    return
-  }
-  const hoje = new Date().toLocaleDateString("pt-BR")
-  lista.innerHTML = `<div class="secao-label">HOJE — ${hoje}</div>`
-  res.data.forEach(h => {
-    const div = document.createElement("div")
-    div.className = "card"
-    div.style.flexDirection = "column"
-    div.style.alignItems = "stretch"
-    div.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px; width:100%;">
-        <button class="habito-check ${h.feito_hoje ? "feito" : ""}" onclick="toggleHabito(${h.id})">${h.feito_hoje ? "✓" : "○"}</button>
-        <div class="card-left">
-          <div class="card-titulo">${h.icone} ${escapeHTML(h.nome)}</div>
-          <div class="card-meta streak">🔥 ${h.streak} dias</div>
-        </div>
-        <div class="card-btns"><button class="btn-icon" onclick="deletarHabito(${h.id})">✕</button></div>
-      </div>
-      <div class="habito-heatmap" id="heatmap-${h.id}"></div>
-    `
-    lista.appendChild(div)
-    renderHeatmap(h.id, h.streak)
-  })
+  const l = document.getElementById("lista-habitos"); mostrarSkeleton(l); const r = await chamarAPI("get_habitos"); if (!r.ok) { l.innerHTML = ""; return }
+  l.innerHTML = ""; if (!r.data.length) { l.innerHTML = `<div class="empty-msg"><div class="empty-icon">📊</div><div class="empty-title">Sem hábitos</div><div class="empty-desc">Crie um!</div></div>`; return }
+  const h = new Date().toLocaleDateString("pt-BR"); l.innerHTML = `<div class="secao-label">HOJE — ${h}</div>`
+  r.data.forEach(hb => { const d = document.createElement("div"); d.className = "card"; d.style.flexDirection = "column"; d.style.alignItems = "stretch"; d.innerHTML = `<div style="display:flex;align-items:center;gap:12px;width:100%"><button class="habito-check ${hb.feito_hoje ? "feito" : ""}" onclick="toggleHabito(${hb.id})">${hb.feito_hoje ? "✓" : "○"}</button><div class="card-left"><div class="card-titulo">${hb.icone} ${escapeHTML(hb.nome)}</div><div class="card-meta streak">🔥 ${hb.streak} dias</div></div><div class="card-btns"><button class="btn-icon" onclick="deletarHabito(${hb.id})">✕</button></div></div><div class="habito-heatmap" id="heatmap-${hb.id}"></div>`; l.appendChild(d); renderHeatmap(hb.id, hb.streak) })
 }
-
-function renderHeatmap(habitoId, streak) {
-  const el = document.getElementById(`heatmap-${habitoId}`)
-  if (!el) return
-  el.innerHTML = ""
-  const hoje = new Date()
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(hoje)
-    d.setDate(d.getDate() - i)
-    const cell = document.createElement("div")
-    cell.className = "heat-cell"
-    if (i < streak) cell.classList.add("filled")
-    const dd = String(d.getDate()).padStart(2, "0")
-    const mm = String(d.getMonth() + 1).padStart(2, "0")
-    cell.title = `${dd}/${mm}`
-    el.appendChild(cell)
-  }
-}
-
-function abrirModalHabito() {
-  document.getElementById("modal-habito").style.display = "flex"
-  document.getElementById("habito-nome").focus()
-}
-
-async function criarHabito() {
-  const nome = document.getElementById("habito-nome").value.trim()
-  const icone = document.getElementById("habito-icone").value.trim() || "⭐"
-  const cor = document.getElementById("habito-cor").value
-  if (!nome) return
-  await chamarAPI("criar_habito", nome, icone, cor)
-  fecharModal("modal-habito")
-  document.getElementById("habito-nome").value = ""
-  await carregarHabitos()
-  await atualizarBadges()
-  showToast("Hábito criado!", nome, "success", 2200)
-}
-
-async function toggleHabito(id) {
-  await chamarAPI("registrar_habito", id)
-  await carregarHabitos()
-  await atualizarBadges()
-}
-
-async function deletarHabito(id) {
-  await chamarAPI("deletar_habito", id)
-  await carregarHabitos()
-  await atualizarBadges()
-}
-
-async function atualizarStatsFoco() {
-  const res = await chamarAPI("get_stats_foco")
-  if (!res.ok) return
-  document.getElementById("foco-stats").textContent = `Hoje: ${res.data.sessoes} sessão(ões) • ${res.data.minutos} minutos`
-}
-
+function renderHeatmap(id, st) { const e = document.getElementById(`heatmap-${id}`); if (!e) return; e.innerHTML = ""; const h = new Date(); for (let i = 29; i >= 0; i--) { const d = new Date(h); d.setDate(d.getDate() - i); const c = document.createElement("div"); c.className = "heat-cell"; if (i < st) c.classList.add("filled"); e.appendChild(c) } }
+function abrirModalHabito() { document.getElementById("modal-habito").style.display = "flex"; document.getElementById("habito-nome").focus() }
+async function criarHabito() { const n = document.getElementById("habito-nome").value.trim(); const ic = document.getElementById("habito-icone").value.trim() || "⭐"; const co = document.getElementById("habito-cor").value; if (!n) return; await chamarAPI("criar_habito", n, ic, co); fecharModal("modal-habito"); document.getElementById("habito-nome").value = ""; await carregarHabitos(); await atualizarBadges(); showToast("Hábito criado!", n, "success", 2200) }
+async function toggleHabito(id) { await chamarAPI("registrar_habito", id); await carregarHabitos(); await atualizarBadges() }
+async function deletarHabito(id) { await chamarAPI("deletar_habito", id); await carregarHabitos(); await atualizarBadges() }
+async function atualizarStatsFoco() { const r = await chamarAPI("get_stats_foco"); if (!r.ok) return; document.getElementById("foco-stats").textContent = `Hoje: ${r.data.sessoes} sessão(ões) • ${r.data.minutos} min` }
 const RING_CIRC = 2 * Math.PI * 110
-
-function atualizarAnelFoco() {
-  const ring = document.querySelector("#foco-ring .ring-fg")
-  if (!ring) return
-  const total = focoTotalSegundos || 1
-  const pct = focoSegundos / total
-  ring.style.strokeDashoffset = RING_CIRC * (1 - pct)
-}
-
+function atualizarAnelFoco() { const r = document.querySelector("#foco-ring .ring-fg"); if (!r) return; r.style.strokeDashoffset = RING_CIRC * (1 - (focoSegundos / (focoTotalSegundos || 1))) }
 function focoIniciar() {
-  const duracaoMin = parseInt(document.getElementById("foco-min").value) || 25
-  const pausaMin = parseInt(document.getElementById("pausa-min").value) || 5
-  focoFase = "foco"
-  focoPausado = false
-  focoSegundos = duracaoMin * 60
-  focoTotalSegundos = focoSegundos
-  document.getElementById("btn-foco-iniciar").disabled = true
-  document.getElementById("btn-foco-pausar").disabled = false
-  document.getElementById("btn-foco-cancelar").disabled = false
-  document.getElementById("foco-fase").textContent = "🎯 FOCO"
-  document.getElementById("foco-fase").style.color = "var(--violeta)"
-  atualizarTimerDisplay(focoSegundos)
-  atualizarAnelFoco()
+  const dm = parseInt(document.getElementById("foco-min").value) || 25; const pm = parseInt(document.getElementById("pausa-min").value) || 5
+  focoFase = "foco"; focoPausado = false; focoSegundos = dm * 60; focoTotalSegundos = focoSegundos
+  document.getElementById("btn-foco-iniciar").disabled = true; document.getElementById("btn-foco-pausar").disabled = false; document.getElementById("btn-foco-cancelar").disabled = false
+  document.getElementById("foco-fase").textContent = "🎯 FOCO"; document.getElementById("foco-fase").style.color = "var(--violeta)"; atualizarTimerDisplay(focoSegundos); atualizarAnelFoco()
   focoInterval = setInterval(() => {
-    if (focoPausado) return
-    focoSegundos--
-    atualizarTimerDisplay(focoSegundos)
-    atualizarAnelFoco()
-    if (focoSegundos <= 0) {
-      clearInterval(focoInterval)
-      if (focoFase === "foco") {
-        focoFase = "pausa"
-        focoSegundos = pausaMin * 60
-        focoTotalSegundos = focoSegundos
-        document.getElementById("foco-fase").textContent = "☕ PAUSA"
-        document.getElementById("foco-fase").style.color = "var(--warning)"
-        atualizarAnelFoco()
-        showToast("Foco concluído!", "Pausa começando", "success", 3000)
-        focoInterval = setInterval(() => {
-          if (focoPausado) return
-          focoSegundos--
-          atualizarTimerDisplay(focoSegundos)
-          atualizarAnelFoco()
-          if (focoSegundos <= 0) {
-            clearInterval(focoInterval)
-            chamarAPI("salvar_sessao_foco", duracaoMin, pausaMin, true)
-            focoReset(duracaoMin)
-            atualizarStatsFoco()
-            showToast("Sessão completa!", "Bom trabalho! 🔥", "success", 3500)
-          }
-        }, 1000)
-      }
-    }
+    if (focoPausado) return; focoSegundos--; atualizarTimerDisplay(focoSegundos); atualizarAnelFoco()
+    if (focoSegundos <= 0) { clearInterval(focoInterval); if (focoFase === "foco") { focoFase = "pausa"; focoSegundos = pm * 60; focoTotalSegundos = focoSegundos; document.getElementById("foco-fase").textContent = "☕ PAUSA"; document.getElementById("foco-fase").style.color = "var(--warning)"; atualizarAnelFoco(); showToast("Foco concluído!", "Pausa", "success", 3000); focoInterval = setInterval(() => { if (focoPausado) return; focoSegundos--; atualizarTimerDisplay(focoSegundos); atualizarAnelFoco(); if (focoSegundos <= 0) { clearInterval(focoInterval); chamarAPI("salvar_sessao_foco", dm, pm, true); focoReset(dm); atualizarStatsFoco(); showToast("Completo!", "🔥", "success", 3500) } }, 1000) } }
   }, 1000)
 }
-
-function focoPausar() {
-  focoPausado = !focoPausado
-  document.getElementById("btn-foco-pausar").textContent = focoPausado ? "▶ Retomar" : "⏸ Pausar"
+function focoPausar() { focoPausado = !focoPausado; document.getElementById("btn-foco-pausar").textContent = focoPausado ? "▶ Retomar" : "⏸ Pausar" }
+function focoCancelar() { clearInterval(focoInterval); const dm = parseInt(document.getElementById("foco-min").value) || 25; chamarAPI("salvar_sessao_foco", dm, parseInt(document.getElementById("pausa-min").value) || 5, false); focoReset(dm) }
+function focoReset(dm = 25) { clearInterval(focoInterval); focoSegundos = 0; focoTotalSegundos = dm * 60; focoPausado = false; document.getElementById("btn-foco-iniciar").disabled = false; document.getElementById("btn-foco-pausar").disabled = true; document.getElementById("btn-foco-cancelar").disabled = true; document.getElementById("btn-foco-pausar").textContent = "⏸ Pausar"; document.getElementById("foco-fase").textContent = "FOCO"; document.getElementById("foco-fase").style.color = "var(--violeta)"; atualizarTimerDisplay(dm * 60); const r = document.querySelector("#foco-ring .ring-fg"); if (r) r.style.strokeDashoffset = 0 }
+function atualizarTimerDisplay(s) { document.getElementById("foco-timer").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` }
+async function selecionarImagem() { const r = await chamarAPI("abrir_arquivo_dialogo"); if (!r.ok || !r.data) return; imagemAtual = r.data.caminho; const p = document.getElementById("imagens-preview"); const ph = document.getElementById("imagens-placeholder"); p.src = r.data.base64; p.style.display = "block"; ph.style.display = "none"; document.getElementById("imagens-info").textContent = `${r.data.largura}×${r.data.altura}px • ${r.data.nome}`; document.getElementById("imagens-status").textContent = "" }
+async function processarImagem(op) {
+  if (!imagemAtual) { document.getElementById("imagens-status").textContent = "⚠ Selecione primeiro"; return }
+  document.getElementById("imagens-status").textContent = "⏳ Processando..."; let p = {}
+  if (op === "melhorar") p = { nitidez: parseFloat(document.getElementById("sl-nitidez").value), brilho: parseFloat(document.getElementById("sl-brilho").value), contraste: parseFloat(document.getElementById("sl-contraste").value), cor: parseFloat(document.getElementById("sl-cor").value) }
+  else if (op === "aumentar") p = { escala: parseInt(document.querySelector('input[name="escala"]:checked').value) }
+  else if (op === "instagram") p = { formato: document.getElementById("formato-instagram").value }
+  else if (op === "trocar_fundo") p = { cor: [parseInt(document.getElementById("cor-fundo").value.slice(1,3),16), parseInt(document.getElementById("cor-fundo").value.slice(3,5),16), parseInt(document.getElementById("cor-fundo").value.slice(5,7),16)] }
+  const r = await chamarAPI("processar_imagem", imagemAtual, op, p)
+  if (r.ok) { document.getElementById("imagens-preview").src = r.data.base64; document.getElementById("imagens-preview").style.display = "block"; document.getElementById("imagens-placeholder").style.display = "none"; document.getElementById("imagens-status").textContent = `✅ ${r.data.caminho.split("\\").pop()}`; showToast("Processado!", r.data.operacao, "success", 2200) }
+  else { document.getElementById("imagens-status").textContent = `❌ ${r.erro}`; showToast("Erro", r.erro, "error") }
 }
-
-function focoCancelar() {
-  clearInterval(focoInterval)
-  const duracaoMin = parseInt(document.getElementById("foco-min").value) || 25
-  const pausaMin = parseInt(document.getElementById("pausa-min").value) || 5
-  chamarAPI("salvar_sessao_foco", duracaoMin, pausaMin, false)
-  focoReset(duracaoMin)
-}
-
-function focoReset(duracaoMin = 25) {
-  clearInterval(focoInterval)
-  focoSegundos = 0
-  focoTotalSegundos = duracaoMin * 60
-  focoPausado = false
-  document.getElementById("btn-foco-iniciar").disabled = false
-  document.getElementById("btn-foco-pausar").disabled = true
-  document.getElementById("btn-foco-cancelar").disabled = true
-  document.getElementById("btn-foco-pausar").textContent = "⏸ Pausar"
-  document.getElementById("foco-fase").textContent = "FOCO"
-  document.getElementById("foco-fase").style.color = "var(--violeta)"
-  atualizarTimerDisplay(duracaoMin * 60)
-  const ring = document.querySelector("#foco-ring .ring-fg")
-  if (ring) ring.style.strokeDashoffset = 0
-}
-
-function atualizarTimerDisplay(seg) {
-  const m = String(Math.floor(seg / 60)).padStart(2, "0")
-  const s = String(seg % 60).padStart(2, "0")
-  document.getElementById("foco-timer").textContent = `${m}:${s}`
-}
-
-async function selecionarImagem() {
-  const res = await chamarAPI("abrir_arquivo_dialogo")
-  if (!res.ok || !res.data) return
-  imagemAtual = res.data.caminho
-  const preview = document.getElementById("imagens-preview")
-  const placeholder = document.getElementById("imagens-placeholder")
-  preview.src = res.data.base64
-  preview.style.display = "block"
-  placeholder.style.display = "none"
-  document.getElementById("imagens-info").textContent = `${res.data.largura}×${res.data.altura}px  •  ${res.data.nome}`
-  document.getElementById("imagens-status").textContent = ""
-}
-
-async function processarImagem(operacao) {
-  if (!imagemAtual) {
-    document.getElementById("imagens-status").textContent = "⚠ Selecione uma imagem primeiro."
-    document.getElementById("imagens-status").style.color = "var(--warning)"
-    return
-  }
-  document.getElementById("imagens-status").textContent = "⏳ Processando..."
-  document.getElementById("imagens-status").style.color = "var(--muted)"
-  let params = {}
-  if (operacao === "melhorar") {
-    params = {
-      nitidez: parseFloat(document.getElementById("sl-nitidez").value),
-      brilho: parseFloat(document.getElementById("sl-brilho").value),
-      contraste: parseFloat(document.getElementById("sl-contraste").value),
-      cor: parseFloat(document.getElementById("sl-cor").value),
-    }
-  } else if (operacao === "aumentar") {
-    params = { escala: parseInt(document.querySelector('input[name="escala"]:checked').value) }
-  } else if (operacao === "instagram") {
-    params = { formato: document.getElementById("formato-instagram").value }
-  } else if (operacao === "trocar_fundo") {
-    params = { cor: hexParaRgb(document.getElementById("cor-fundo").value) }
-  }
-  const res = await chamarAPI("processar_imagem", imagemAtual, operacao, params)
-  if (res.ok) {
-    const preview = document.getElementById("imagens-preview")
-    preview.src = res.data.base64
-    preview.style.display = "block"
-    document.getElementById("imagens-placeholder").style.display = "none"
-    document.getElementById("imagens-status").textContent = `✅ Salvo: ${res.data.caminho.split("\\").pop()}`
-    document.getElementById("imagens-status").style.color = "var(--success)"
-    showToast("Imagem processada!", res.data.operacao, "success", 2200)
-  } else {
-    document.getElementById("imagens-status").textContent = `❌ ${res.erro}`
-    document.getElementById("imagens-status").style.color = "var(--danger)"
-    showToast("Erro", res.erro, "error")
-  }
-}
-
-function hexParaRgb(hex) {
-  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]
-}
-
 async function aplicarEdicaoTexto() {
-  if (!imagemAtual) {
-    document.getElementById("imagens-status").textContent = "⚠ Selecione uma imagem primeiro."
-    document.getElementById("imagens-status").style.color = "var(--warning)"
-    return
-  }
-  const instrucao = document.getElementById("imagens-instrucao").value.trim()
-  if (!instrucao) return
-  document.getElementById("imagens-status").textContent = "🤔 Entendendo seu pedido..."
-  document.getElementById("imagens-status").style.color = "var(--muted)"
-  const res = await chamarAPI("interpretar_e_processar_imagem", imagemAtual, instrucao)
-  if (res.ok) {
-    const preview = document.getElementById("imagens-preview")
-    preview.src = res.data.base64
-    preview.style.display = "block"
-    document.getElementById("imagens-placeholder").style.display = "none"
-    document.getElementById("imagens-status").textContent = `✅ Aplicado: ${res.data.operacao} • Salvo: ${res.data.caminho.split("\\").pop()}`
-    document.getElementById("imagens-status").style.color = "var(--success)"
-  } else {
-    document.getElementById("imagens-status").textContent = `❌ ${res.erro}`
-    document.getElementById("imagens-status").style.color = "var(--danger)"
-  }
+  if (!imagemAtual) return; const ins = document.getElementById("imagens-instrucao").value.trim(); if (!ins) return
+  document.getElementById("imagens-status").textContent = "🤔 Entendendo..."; const r = await chamarAPI("interpretar_e_processar_imagem", imagemAtual, ins)
+  if (r.ok) { document.getElementById("imagens-preview").src = r.data.base64; document.getElementById("imagens-preview").style.display = "block"; document.getElementById("imagens-placeholder").style.display = "none"; document.getElementById("imagens-status").textContent = `✅ ${r.data.operacao}` }
+  else document.getElementById("imagens-status").textContent = `❌ ${r.erro}`
 }
-
 function fecharModal(id) { document.getElementById(id).style.display = "none" }
-
-document.addEventListener("click", e => {
-  if (e.target.classList.contains("modal")) e.target.style.display = "none"
-})
+document.addEventListener("click", e => { if (e.target.classList.contains("modal")) e.target.style.display = "none" })
