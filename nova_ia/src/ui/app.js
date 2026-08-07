@@ -8,6 +8,10 @@ let imagemAtual = null
 let settings = { particles: true, animations: true, theme: "light" }
 let ultimaMsgNova = null
 let contextMsgEl = null
+let cidadeDashboard = "São Paulo"
+
+function storageGet(chave, fallback = null) { try { return window.localStorage.getItem(chave) || fallback } catch (e) { return fallback } }
+function storageSet(chave, valor) { try { window.localStorage.setItem(chave, valor) } catch (e) { console.warn("Armazenamento local indisponível:", e) } }
 
 async function chamarAPI(fn, ...args) {
   try { const raw = await window.pywebview.api[fn](...args); return JSON.parse(raw) }
@@ -15,7 +19,39 @@ async function chamarAPI(fn, ...args) {
 }
 function agoraHora() { const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}` }
 function escapeHTML(str) { return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
-function renderMarkdown(texto) { if (typeof marked !== "undefined") { try { return marked.parse(texto) } catch (e) {} } return escapeHTML(texto).replace(/\n/g, "<br>") }
+function sanitizarHTML(html) {
+  const template = document.createElement("template"); template.innerHTML = html
+  template.content.querySelectorAll("script,iframe,object,embed,style,link,meta").forEach(el => el.remove())
+  template.content.querySelectorAll("*").forEach(el => [...el.attributes].forEach(attr => {
+    const nome = attr.name.toLowerCase(), valor = attr.value.trim().toLowerCase()
+    if (nome.startsWith("on") || ((nome === "href" || nome === "src") && valor.startsWith("javascript:"))) el.removeAttribute(attr.name)
+  }))
+  return template.innerHTML
+}
+function renderMarkdown(texto) {
+  const seguro = escapeHTML(texto)
+  if (typeof marked !== "undefined") { try { return sanitizarHTML(marked.parse(texto, { breaks: true, gfm: true })) } catch (e) {} }
+  // Fallback offline: ao menos preserva blocos de código cercados por ```.
+  return seguro.split(/(```[\s\S]*?```)/g).map(parte => {
+    const bloco = parte.match(/^```([\w.+#-]*)\n?([\s\S]*?)```$/)
+    if (bloco) return `<pre><code class="language-${bloco[1] || "text"}">${bloco[2].replace(/\n$/, "")}</code></pre>`
+    return parte.replace(/\n/g, "<br>")
+  }).join("")
+}
+function decorarBlocosCodigo(raiz) {
+  if (!raiz) return
+  raiz.querySelectorAll("pre").forEach(pre => {
+    if (pre.parentElement?.classList.contains("code-block")) return
+    const code = pre.querySelector("code"); if (!code) return
+    const linguagem = ([...code.classList].find(c => c.startsWith("language-")) || "language-code").replace("language-", "")
+    const wrap = document.createElement("div"); wrap.className = "code-block"
+    const header = document.createElement("div"); header.className = "code-header"
+    const nome = document.createElement("span"); nome.textContent = linguagem || "code"
+    const copiar = document.createElement("button"); copiar.type = "button"; copiar.textContent = "Copiar código"
+    copiar.addEventListener("click", () => navigator.clipboard.writeText(code.textContent).then(() => { copiar.textContent = "Copiado ✓"; setTimeout(() => copiar.textContent = "Copiar código", 1600) }))
+    header.append(nome, copiar); pre.parentNode.insertBefore(wrap, pre); wrap.append(header, pre)
+  })
+}
 function esconderSplash() { const s = document.getElementById("splash"); if (s) setTimeout(() => s.classList.add("hidden"), 1200) }
 function showToast(titulo, msg = "", tipo = "info", duracao = 3500) {
   const c = document.getElementById("toast-container"); const t = document.createElement("div"); t.className = `toast ${tipo}`
@@ -51,6 +87,9 @@ window.addEventListener("pywebviewready", async () => {
   cm.addEventListener("scroll", () => { const b = document.getElementById("scroll-bottom-btn"); b.classList.toggle("visible", cm.scrollHeight - cm.scrollTop - cm.clientHeight > 80) })
   document.addEventListener("click", () => document.getElementById("context-menu").classList.remove("visible"))
   setupSidebarDrag(); document.addEventListener("keydown", handleAtalhos)
+  cidadeDashboard = storageGet("novaCidade", "São Paulo")
+  document.getElementById("input-cidade").value = cidadeDashboard
+  try { await carregarDashboard() } catch (e) { console.error(e); mostrarErroDashboard(String(e)) }
   try { await abrirUltimaConversa() } catch (e) { console.error(e) }
   try { await carregarResumoMatinal() } catch (e) { console.error(e) }
   try { await atualizarStatsFoco() } catch (e) { console.error(e) }
@@ -83,7 +122,34 @@ async function atualizarKeyDot() {
 function trocarAba(aba) {
   document.querySelectorAll(".aba").forEach(a => a.classList.remove("active")); document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"))
   document.getElementById(`aba-${aba}`).classList.add("active"); document.querySelector(`[data-aba="${aba}"]`).classList.add("active")
-  if (aba === "tarefas") carregarTarefas(); if (aba === "lembretes") carregarLembretes(); if (aba === "habitos") carregarHabitos(); if (aba === "foco") atualizarStatsFoco()
+  if (aba === "dashboard") carregarDashboard(); if (aba === "tarefas") carregarTarefas(); if (aba === "lembretes") carregarLembretes(); if (aba === "habitos") carregarHabitos(); if (aba === "foco") atualizarStatsFoco()
+}
+
+function formatarUptime(segundos) { if (segundos == null) return "indisponível"; const d = Math.floor(segundos / 86400), h = Math.floor((segundos % 86400) / 3600), m = Math.floor((segundos % 3600) / 60); return `${d ? d + "d " : ""}${h}h ${m}m` }
+function iconeClima(codigo) { if (codigo === 0) return "☀"; if (codigo <= 3) return "⛅"; if (codigo <= 48) return "≋"; if (codigo >= 95) return "ϟ"; if (codigo >= 71 && codigo <= 75) return "❄"; return "☂" }
+function moeda(valor) { return valor == null ? "—" : Number(valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) }
+function mostrarErroDashboard(erro) {
+  const mensagem = escapeHTML(erro || "Falha desconhecida")
+  const clima = document.getElementById("dash-clima"), financas = document.getElementById("dash-financas")
+  if (clima) clima.innerHTML = `<div class="dash-error">Não foi possível carregar os dados.<br><small>${mensagem}</small></div>`
+  if (financas) financas.innerHTML = `<div class="dash-error">Não foi possível carregar os dados.<br><small>${mensagem}</small></div>`
+}
+async function carregarDashboard(forcar = false) {
+  if (!forcar && carregarDashboard.carregando) return
+  carregarDashboard.carregando = true
+  const agora = new Date(); const hora = agora.getHours(); const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite"
+  document.getElementById("dashboard-saudacao").textContent = `${saudacao}, chefe.`
+  document.getElementById("dashboard-data").textContent = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
+  if (forcar) { document.getElementById("dash-clima").textContent = "Atualizando..."; document.getElementById("dash-financas").textContent = "Atualizando..." }
+  const cidade = cidadeDashboard || "São Paulo"
+  const r = await chamarAPI("get_dashboard", cidade); carregarDashboard.carregando = false
+  if (!r.ok) { mostrarErroDashboard(r.erro); showToast("Dashboard indisponível", r.erro, "error"); return }
+  const d = r.data, c = d.clima, f = d.financas, s = d.computador
+  document.getElementById("dash-clima").innerHTML = c ? `<div class="weather-main"><span class="weather-icon">${iconeClima(c.codigo)}</span><strong>${c.temperatura}°</strong><div><b>${escapeHTML(c.cidade)}</b><small>${escapeHTML(c.descricao)}</small></div></div><div class="weather-stats"><span>Sensação <b>${c.sensacao}°</b></span><span>Máx / mín <b>${c.maxima}° / ${c.minima}°</b></span><span>Umidade <b>${c.umidade}%</b></span><span>Chuva <b>${c.chuva}%</b></span></div>` : `<div class="dash-error">Clima indisponível<br><small>${escapeHTML(d.erros.clima || "Tente atualizar")}</small></div>`
+  const variacao = f?.bitcoin_variacao; const classe = variacao == null ? "" : variacao >= 0 ? "up" : "down"
+  document.getElementById("dash-financas").innerHTML = f ? `<div class="quote-row"><span><i>US</i> Dólar</span><b>${moeda(f.dolar)}</b></div><div class="quote-row"><span><i>EU</i> Euro</span><b>${moeda(f.euro)}</b></div><div class="quote-row"><span><i>₿</i> Bitcoin</span><div><b>${moeda(f.bitcoin)}</b>${variacao != null ? `<small class="${classe}">${variacao >= 0 ? "+" : ""}${variacao.toFixed(2)}%</small>` : ""}</div></div>` : `<div class="dash-error">Cotações indisponíveis</div>`
+  document.getElementById("dash-sistema").innerHTML = `<div class="nova-ascii"><span>╭────────╮</span><span>│  N O V A │</span><span>│    ◉     │</span><span>╰────────╯</span></div><div class="system-lines"><div><b>${escapeHTML(s.usuario)}@${escapeHTML(s.hostname)}</b></div><div><span>OS</span>${escapeHTML(s.sistema)}</div><div><span>CPU</span>${escapeHTML(s.processador)}</div><div><span>Cores</span>${s.nucleos}</div><div><span>RAM</span>${s.ram_usada ? `${s.ram_usada} / ${s.ram_total} (${s.ram_percentual}%)` : "instale psutil para monitorar"}</div><div><span>Disk</span>${s.disco_usado} / ${s.disco_total} (${s.disco_percentual}%)</div><div><span>Uptime</span>${formatarUptime(s.uptime_segundos)}</div><div class="terminal-colors"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>`
+  document.getElementById("dashboard-atualizado").textContent = `Atualizado às ${new Date(d.atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
 }
 async function abrirUltimaConversa() {
   const r = await chamarAPI("get_sessoes"); if (!r.ok || !r.data || !r.data.length) { await novaConversa(); return }
@@ -105,6 +171,7 @@ function adicionarMensagem(tipo, texto, extraClass = "") {
     const isResumo = extraClass === "resumo"
     div.innerHTML = `<div class="msg-avatar">N</div><div class="msg-content"><div class="bubble ${isResumo ? "" : "markdown"}">${isResumo ? escapeHTML(texto).replace(/\n/g, "<br>") : renderMarkdown(texto)}</div><div class="msg-meta">${hora}</div>${!isResumo ? `<div class="msg-actions"><button class="msg-action-btn" onclick="copiarMensagem(this)" title="Copiar"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</button><button class="msg-action-btn" onclick="regenerarMensagem(this)" title="Regenerar"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</button></div>` : ""}</div>`
     if (!extraClass) { div.classList.add("nova-flash"); ultimaMsgNova = div }
+    decorarBlocosCodigo(div.querySelector(".bubble"))
     div.querySelector(".bubble").addEventListener("contextmenu", e => { e.preventDefault(); contextMsgEl = div; mostrarContextMenu(e.clientX, e.clientY) })
   } else if (tipo === "user") {
     div.innerHTML = `<div class="msg-content"><div class="bubble">${escapeHTML(texto).replace(/\n/g, "<br>")}</div><div class="msg-meta">${hora}</div></div>`
@@ -147,12 +214,12 @@ async function enviarMensagem() {
   await carregarSessoes(); marcarSessaoAtiva(sessaoAtual)
 }
 window.__novaChunk = function(texto) { if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk(); const b = document.getElementById("streaming-bubble"); if (!b) return; const c = b.querySelector(".streaming-cursor"); if (c) c.remove(); b.appendChild(document.createTextNode(texto)); if (c) b.appendChild(c); const m = document.getElementById("chat-msgs"); if (m.scrollHeight - m.scrollTop - m.clientHeight < 100) m.scrollTop = m.scrollHeight }
-window.__novaFim = function() { const b = document.getElementById("streaming-bubble"); if (!b) return; b.removeAttribute("id"); const c = b.querySelector(".streaming-cursor"); if (c) c.remove() }
+window.__novaFim = function() { const b = document.getElementById("streaming-bubble"); if (!b) return; const c = b.querySelector(".streaming-cursor"); if (c) c.remove(); const texto = b.textContent; b.innerHTML = renderMarkdown(texto); decorarBlocosCodigo(b); b.removeAttribute("id") }
 window.__novaErro = function(msg) { if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk(); const b = document.getElementById("streaming-bubble"); if (!b) return; b.removeAttribute("id"); b.textContent = `❌ ${msg}`; showToast("Erro", msg, "error") }
 window.__novaAgenteAcao = function(tipo, desc) { const ic = { tarefa: "✅", lembrete: "⏰", listar: "📋" }; showToast(`${ic[tipo] || "✨"} Ação executada`, desc, "success", 3000); atualizarBadges() }
 function abrirModalConfig() { document.getElementById("modal-config").style.display = "flex"; atualizarKeyDot() }
 function toggleSetting(key, el) { el.classList.toggle("on"); settings[key] = el.classList.contains("on"); if (key === "particles") criarParticulas() }
-async function salvarConfig() { const k = document.getElementById("input-key").value.trim(); if (k) { await chamarAPI("salvar_api_key", k); showToast("API Key salva!", "", "success", 2000) } fecharModal("modal-config"); await atualizarKeyDot() }
+async function salvarConfig() { const k = document.getElementById("input-key").value.trim(); cidadeDashboard = document.getElementById("input-cidade").value.trim() || "São Paulo"; storageSet("novaCidade", cidadeDashboard); if (k) { await chamarAPI("salvar_api_key", k); showToast("API Key salva!", "", "success", 2000) } fecharModal("modal-config"); await atualizarKeyDot(); carregarDashboard(true) }
 function mostrarSkeleton(lista, n = 3) { lista.innerHTML = ""; for (let i = 0; i < n; i++) { const s = document.createElement("div"); s.className = "skeleton-card"; s.innerHTML = `<div style="flex:1"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>`; lista.appendChild(s) } }
 async function carregarTarefas() {
   const l = document.getElementById("lista-tarefas"); mostrarSkeleton(l); const r = await chamarAPI("get_tarefas"); if (!r.ok) { l.innerHTML = ""; return }

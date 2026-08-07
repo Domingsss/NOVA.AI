@@ -11,7 +11,7 @@ from PIL import Image
 # Importando seus arquivos originais sem modificar nada!
 from database import *
 from helpers import *
-from api import *  # Seu api.py original (onde está a Groq/OpenAI)
+from api import *  # API principal da NOVA
 from rotinas import gerar_resumo_matinal, iniciar_rotinas
 
 class Api:
@@ -75,7 +75,7 @@ class Api:
             if not api_key:
                 return self._response(ok=False, erro="API Key não configurada.")
                 
-            resposta = chamar_groq(api_key, historico)
+            resposta = chamar_gemini(api_key, historico)
             salvar_mensagem(sessao_id, "assistant", resposta)
             
             return self._response(data={"tipo": "texto", "resposta": resposta})

@@ -3,7 +3,7 @@ import datetime
 import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox, ttk
 from colors import BG, SURFACE, SURFACE2, PURPLE, TEAL, TEXT, MUTED, WHITE
-from helpers import salvar_key, carregar_key, chamar_groq
+from helpers import salvar_key, carregar_key, chamar_gemini
 from database import (
     criar_sessao, listar_sessoes, renomear_sessao, deletar_sessao,
     salvar_mensagem, carregar_historico, limpar_historico,
@@ -157,7 +157,7 @@ class PainelChat(tk.Frame):
         threading.Thread(target=self._responder, daemon=True).start()
 
     def _responder(self):
-        resposta = chamar_groq(self.app.api_key, self.historico)
+        resposta = chamar_gemini(self.app.api_key, self.historico)
         self.historico.append({"role": "assistant", "content": resposta})
         salvar_mensagem(self.sessao_id, "assistant", resposta)
         self.after(0, self._mostrar_resposta, resposta)
@@ -823,8 +823,8 @@ class NovaApp:
 
     def pedir_key(self):
         key = simpledialog.askstring(
-            "Groq API Key",
-            "Cole sua Groq API key:\n(console.groq.com → API Keys → Create)",
+            "Gemini API Key",
+            "Cole sua Gemini API key:\n(aistudio.google.com → Get API key)",
             show="*", parent=self.root
         )
         if key and key.strip():

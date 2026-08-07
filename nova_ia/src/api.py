@@ -4,7 +4,15 @@ import json
 import time
 import base64
 import datetime
-from helpers import carregar_key, salvar_key, chamar_groq, chamar_groq_simples, chamar_groq_stream
+import getpass
+import platform
+import shutil
+import socket
+import ssl
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from helpers import carregar_key, salvar_key, chamar_gemini, chamar_gemini_simples, chamar_gemini_stream
 from database import (
     criar_sessao, listar_sessoes, renomear_sessao, deletar_sessao,
     salvar_mensagem, carregar_historico, limpar_historico,
@@ -26,6 +34,159 @@ class API:
 
     def _erro(self, msg):
         return json.dumps({"ok": False, "erro": str(msg)})
+
+    # ── Dashboard ─────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_json(url: str):
+        headers = {"User-Agent": "NOVA-Desktop/1.0", "Accept": "application/json"}
+        erros = []
+        # httpx costuma lidar melhor com proxy/certificados em builds Windows.
+        try:
+            import httpx
+            with httpx.Client(timeout=7, follow_redirects=True) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                return response.json()
+        except ImportError:
+            pass
+        except Exception as erro:
+            erros.append(f"httpx: {erro}")
+
+        req = urllib.request.Request(url, headers=headers)
+        contexto = ssl.create_default_context()
+        # PyInstaller nem sempre encontra os certificados do sistema no Windows.
+        try:
+            import certifi
+            contexto = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            pass
+        ultimo_erro = None
+        for tentativa in range(2):
+            try:
+                with urllib.request.urlopen(req, timeout=7, context=contexto) as response:
+                    return json.load(response)
+            except Exception as erro:
+                ultimo_erro = erro
+                if tentativa == 0:
+                    time.sleep(0.5)
+        erros.append(f"urllib: {ultimo_erro}")
+        raise RuntimeError(" | ".join(erros))
+
+    @staticmethod
+    def _formatar_bytes(valor):
+        valor = float(valor)
+        for unidade in ("B", "KB", "MB", "GB", "TB"):
+            if valor < 1024 or unidade == "TB":
+                return f"{valor:.1f} {unidade}"
+            valor /= 1024
+
+    def _info_computador(self):
+        disco = shutil.disk_usage(os.path.abspath(os.sep))
+        info = {
+            "usuario": getpass.getuser(),
+            "hostname": socket.gethostname(),
+            "sistema": f"{platform.system()} {platform.release()}",
+            "arquitetura": platform.machine() or "desconhecida",
+            "processador": platform.processor() or "Processador não identificado",
+            "nucleos": os.cpu_count() or 0,
+            "python": platform.python_version(),
+            "disco_usado": self._formatar_bytes(disco.used),
+            "disco_total": self._formatar_bytes(disco.total),
+            "disco_percentual": round(disco.used / disco.total * 100),
+        }
+        try:
+            import psutil
+            memoria = psutil.virtual_memory()
+            info.update({
+                "cpu_percentual": round(psutil.cpu_percent(interval=0.15)),
+                "ram_usada": self._formatar_bytes(memoria.used),
+                "ram_total": self._formatar_bytes(memoria.total),
+                "ram_percentual": round(memoria.percent),
+                "uptime_segundos": max(0, int(time.time() - psutil.boot_time())),
+            })
+        except ImportError:
+            info.update({"cpu_percentual": None, "ram_usada": None,
+                         "ram_total": None, "ram_percentual": None,
+                         "uptime_segundos": None})
+        return info
+
+    def _info_clima(self, cidade):
+        busca = urllib.parse.urlencode({"name": cidade, "count": 1, "language": "pt", "format": "json"})
+        geo = self._get_json(f"https://geocoding-api.open-meteo.com/v1/search?{busca}")
+        resultados = geo.get("results") or []
+        if not resultados:
+            raise ValueError(f"Cidade não encontrada: {cidade}")
+        local = resultados[0]
+        params = urllib.parse.urlencode({
+            "latitude": local["latitude"], "longitude": local["longitude"],
+            "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "timezone": "auto", "forecast_days": 1,
+        })
+        previsao = self._get_json(f"https://api.open-meteo.com/v1/forecast?{params}")
+        atual, diario = previsao["current"], previsao["daily"]
+        descricoes = {
+            0: "Céu limpo", 1: "Predominantemente limpo", 2: "Parcialmente nublado",
+            3: "Nublado", 45: "Neblina", 48: "Neblina com geada",
+            51: "Garoa leve", 53: "Garoa", 55: "Garoa forte", 61: "Chuva leve",
+            63: "Chuva", 65: "Chuva forte", 71: "Neve leve", 73: "Neve",
+            75: "Neve forte", 80: "Pancadas leves", 81: "Pancadas de chuva",
+            82: "Pancadas fortes", 95: "Trovoadas", 96: "Trovoadas com granizo",
+            99: "Trovoadas fortes",
+        }
+        return {
+            "cidade": local["name"], "regiao": local.get("admin1", ""),
+            "temperatura": round(atual["temperature_2m"]),
+            "sensacao": round(atual["apparent_temperature"]),
+            "umidade": atual["relative_humidity_2m"], "vento": round(atual["wind_speed_10m"]),
+            "codigo": atual["weather_code"],
+            "descricao": descricoes.get(atual["weather_code"], "Condição variável"),
+            "maxima": round(diario["temperature_2m_max"][0]),
+            "minima": round(diario["temperature_2m_min"][0]),
+            "chuva": diario["precipitation_probability_max"][0],
+        }
+
+    def _info_financas(self):
+        resultado = {"dolar": None, "euro": None, "bitcoin": None, "bitcoin_variacao": None}
+        erros = []
+        try:
+            cambio = self._get_json("https://api.frankfurter.dev/v1/latest?base=USD&symbols=BRL,EUR")
+            resultado["dolar"] = cambio.get("rates", {}).get("BRL")
+            eur_por_usd = cambio.get("rates", {}).get("EUR")
+            if resultado["dolar"] and eur_por_usd:
+                resultado["euro"] = resultado["dolar"] / eur_por_usd
+        except Exception as erro:
+            erros.append(f"câmbio: {erro}")
+        try:
+            cripto = self._get_json(
+                "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl&include_24hr_change=true"
+            ).get("bitcoin", {})
+            resultado["bitcoin"] = cripto.get("brl")
+            resultado["bitcoin_variacao"] = cripto.get("brl_24h_change")
+        except Exception as erro:
+            erros.append(f"bitcoin: {erro}")
+        if all(resultado[chave] is None for chave in ("dolar", "euro", "bitcoin")):
+            raise RuntimeError("; ".join(erros) or "Nenhuma cotação disponível")
+        resultado["avisos"] = erros
+        return resultado
+
+    def get_dashboard(self, cidade: str = "São Paulo"):
+        """Retorna dados independentes; uma fonte fora do ar não derruba o painel."""
+        cidade = (cidade or "São Paulo").strip()[:80]
+        dados = {"computador": self._info_computador(), "clima": None, "financas": None,
+                 "erros": {}, "atualizado_em": datetime.datetime.now().isoformat(timespec="minutes")}
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            tarefas = {"clima": executor.submit(self._info_clima, cidade),
+                       "financas": executor.submit(self._info_financas)}
+            for nome, tarefa in tarefas.items():
+                try:
+                    dados[nome] = tarefa.result()
+                except Exception as erro:
+                    dados["erros"][nome] = str(erro)
+        if dados["erros"]:
+            print(f"[NOVA] Dashboard com falhas: {dados['erros']}")
+        return self._ok(dados)
 
     # ── API Key ───────────────────────────────────────────────────────────────
 
@@ -131,7 +292,7 @@ class API:
                 pass  # best-effort: não deixa a busca quebrar o chat
 
             try:
-                resposta = chamar_groq(api_key, historico)
+                resposta = chamar_gemini(api_key, historico)
             except Exception as e:
                 # Erro da API: NÃO salva uma "resposta" de erro no banco,
                 # pois poluiria o histórico e confundiria a IA nas próximas
@@ -199,7 +360,7 @@ class API:
 
             resposta_completa = ""
             try:
-                for chunk in chamar_groq_stream(api_key, historico):
+                for chunk in chamar_gemini_stream(api_key, historico):
                     resposta_completa += chunk
                     emit(f"window.__novaChunk && window.__novaChunk({json.dumps(chunk)});")
             except Exception as e:
@@ -254,7 +415,7 @@ Regras:
 Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
 {{"acao": "...", "params": {{...}}}}"""
 
-            resposta = chamar_groq_simples(system, mensagem)
+            resposta = chamar_gemini_simples(system, mensagem)
             texto = resposta.strip()
             if texto.startswith("```"):
                 texto = texto.strip("`")
@@ -341,7 +502,7 @@ Responda APENAS com um JSON válido, sem markdown:
 ou
 {"buscar": false, "query": ""}"""
 
-            resposta = chamar_groq_simples(system, mensagem)
+            resposta = chamar_gemini_simples(system, mensagem)
             texto = resposta.strip()
             if texto.startswith("```"):
                 texto = texto.strip("`")
@@ -429,7 +590,7 @@ ou
                 "da mensagem do usuário. Sem aspas, sem pontuação final, sem "
                 "prefixos como 'Título:'. Responda APENAS com o título."
             )
-            titulo = chamar_groq_simples(system, primeira_msg[:500]).strip()
+            titulo = chamar_gemini_simples(system, primeira_msg[:500]).strip()
             # Limpa aspas e eventuais aspas envolvendo o título
             titulo = titulo.strip("\"'").strip()
             if len(titulo) > 60:
@@ -714,7 +875,7 @@ Se FOR um pedido de edição, escolha a operação mais adequada:
 
 Responda APENAS com um JSON válido, sem texto antes ou depois, sem markdown."""
 
-            resposta = chamar_groq_simples(system, instrucao or "melhore essa imagem")
+            resposta = chamar_gemini_simples(system, instrucao or "melhore essa imagem")
 
             texto = resposta.strip()
             if texto.startswith("```"):
@@ -747,7 +908,7 @@ Responda APENAS com um JSON válido, sem texto antes ou depois, sem markdown."""
 DESCRITIVO em INGLÊS, no estilo usado para Stable Diffusion. Responda APENAS
 com o prompt em inglês, sem explicações, sem aspas, sem texto adicional."""
 
-            prompt_en = chamar_groq_simples(system, prompt).strip()
+            prompt_en = chamar_gemini_simples(system, prompt).strip()
 
             resultado = gerar_imagem_ia(prompt_en)
 

@@ -10,6 +10,8 @@ import sys
 import json
 import subprocess
 import datetime
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 def load_config():
@@ -18,8 +20,8 @@ def load_config():
     if not config_path.exists():
         return {
             "vault_path": "", "commits_folder": "Commits", "project_name": "Projeto",
-            "api_key_paths": ["src/APICHV.json", "APICHV.json"],
-            "groq_model": "meta-llama/llama-4-scout-17b-16e-instruct",
+            "api_key_paths": ["src/GEMINI_API_KEY.json", "GEMINI_API_KEY.json"],
+            "gemini_model": "gemini-3.6-flash",
             "max_diff_chars": 8000, "default_tags": ["commit", "desenvolvimento"],
             "include_diff": True, "max_diff_in_markdown": 3000,
         }
@@ -82,13 +84,9 @@ def get_api_key(config):
 def generate_summary(diff, commit_msg, config):
     api_key = get_api_key(config)
     if not api_key:
-        return "API key não encontrada — resumo IA indisponível. Configure em src/APICHV.json"
-    try:
-        from groq import Groq
-    except ImportError:
-        return "pacote groq não instalado — rode: pip install groq"
-    
-    model = config.get("groq_model", "meta-llama/llama-4-scout-17b-16e-instruct")
+        return "API key não encontrada — resumo IA indisponível. Configure em src/GEMINI_API_KEY.json"
+
+    model = config.get("gemini_model", "gemini-3.6-flash")
     system = """Você é um assistente que analisa commits de código e gera resumos claros e concisos em português brasileiro.
 Gere um resumo que explique:
 1. O QUE foi feito (em linguagem simples)
@@ -103,12 +101,22 @@ Formato:
     user_msg = f"Mensagem do commit: {commit_msg}\n\nDiff:\n```\n{diff}\n```"
     
     try:
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model=model, max_tokens=500,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        payload = json.dumps({
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user_msg}]}],
+            "generationConfig": {"maxOutputTokens": 500},
+        }).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+            method="POST",
         )
-        return response.choices[0].message.content.strip()
+        with urllib.request.urlopen(request, timeout=90) as response:
+            data = json.load(response)
+        parts = data["candidates"][0]["content"]["parts"]
+        return "".join(part.get("text", "") for part in parts).strip()
     except Exception as e:
         return f"erro ao gerar resumo: {e}"
 
