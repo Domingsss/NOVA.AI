@@ -1,5 +1,6 @@
 # src/main.py
 import os
+import shutil
 import sys
 import traceback
 import webview
@@ -56,6 +57,16 @@ def main():
     gui = "edgechromium" if sys.platform == "win32" else None
     storage_dir = os.path.join(os.path.dirname(SRC_DIR), "data", "webview")
     os.makedirs(storage_dir, exist_ok=True)
+    # O WebKitGTK pode reutilizar JS/CSS antigos mesmo depois de reiniciar o app.
+    # Limpa somente os arquivos temporários de cache; localStorage e preferências
+    # da NOVA continuam preservados no restante de storage_dir.
+    cache_dir = os.path.join(storage_dir, "cache")
+    if os.path.isdir(cache_dir):
+        try:
+            shutil.rmtree(cache_dir)
+            print("[NOVA] Cache visual atualizado")
+        except OSError as erro:
+            print(f"[NOVA] Aviso ao limpar cache visual: {erro}")
     webview.start(
         debug=False,
         gui=gui,

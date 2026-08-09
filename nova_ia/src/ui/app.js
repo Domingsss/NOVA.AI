@@ -139,7 +139,7 @@ function criarParticulas() {
   const c = document.getElementById("chat-particles"); if (!c) return; c.innerHTML = ""
   if (!settings.particles) return
   const cores = ["", "magenta", "amber", "cyan"]
-  for (let i = 0; i < 20; i++) { const p = document.createElement("div"); p.className = "particle " + cores[Math.floor(Math.random() * cores.length)]; if (Math.random() > 0.7) p.classList.add("big"); p.style.left = Math.random() * 100 + "%"; p.style.animationDuration = (12 + Math.random() * 10) + "s"; p.style.animationDelay = (Math.random() * 15) + "s"; c.appendChild(p) }
+  for (let i = 0; i < 32; i++) { const p = document.createElement("div"); p.className = "particle " + cores[Math.floor(Math.random() * cores.length)]; if (Math.random() > 0.72) p.classList.add("big"); p.style.left = Math.random() * 100 + "%"; p.style.animationDuration = (14 + Math.random() * 12) + "s"; p.style.animationDelay = (-Math.random() * 24) + "s"; c.appendChild(p) }
 }
 function aplicarTema(tema) {
   document.body.setAttribute("data-theme", tema); settings.theme = tema
@@ -149,9 +149,17 @@ function aplicarTema(tema) {
 async function toggleTheme() { const n = settings.theme === "light" ? "dark" : "light"; aplicarTema(n); await chamarAPI("salvar_tema", n) }
 function setTheme(tema) { aplicarTema(tema); chamarAPI("salvar_tema", tema) }
 function toggleSidebar() { document.body.classList.toggle("sidebar-collapsed") }
+function atualizarLayoutResponsivo() {
+  const largura = window.innerWidth, altura = window.innerHeight
+  document.body.classList.toggle("layout-wide", largura >= 1450)
+  document.body.classList.toggle("layout-compact", largura < 900 || altura < 650)
+  document.documentElement.style.setProperty("--viewport-height", `${altura}px`)
+}
+window.addEventListener("resize", atualizarLayoutResponsivo)
 
 window.addEventListener("pywebviewready", async () => {
   esconderSplash()
+  atualizarLayoutResponsivo()
   try { const r = await chamarAPI("carregar_tema"); if (r.ok) aplicarTema(r.data.tema || "light"); else aplicarTema("light") } catch (e) { aplicarTema("light") }
   criarParticulas()
   document.querySelectorAll(".nav-btn").forEach(b => b.addEventListener("click", () => trocarAba(b.dataset.aba)))
@@ -168,6 +176,7 @@ window.addEventListener("pywebviewready", async () => {
   vozNovaAtiva = storageGet("novaVozAtiva", "1") !== "0"; atualizarControlesVoz()
   document.getElementById("input-cidade").value = cidadeDashboard
   try { await carregarDashboard() } catch (e) { console.error(e); mostrarErroDashboard(String(e)) }
+  iniciarMonitorSistema()
   try { await abrirUltimaConversa() } catch (e) { console.error(e) }
   try { await carregarResumoMatinal() } catch (e) { console.error(e) }
   try { await atualizarStatsFoco() } catch (e) { console.error(e) }
@@ -227,10 +236,32 @@ async function carregarDashboard(forcar = false) {
   document.getElementById("dash-clima").innerHTML = c ? `<div class="weather-main"><span class="weather-icon">${iconeClima(c.codigo)}</span><strong>${c.temperatura}°</strong><div><b>${escapeHTML(c.cidade)}</b><small>${escapeHTML(c.descricao)}</small></div></div><div class="weather-stats"><span>Sensação <b>${c.sensacao}°</b></span><span>Máx / mín <b>${c.maxima}° / ${c.minima}°</b></span><span>Umidade <b>${c.umidade}%</b></span><span>Chuva <b>${c.chuva}%</b></span></div>` : `<div class="dash-error">Clima indisponível<br><small>${escapeHTML(d.erros.clima || "Tente atualizar")}</small></div>`
   const variacao = f?.bitcoin_variacao; const classe = variacao == null ? "" : variacao >= 0 ? "up" : "down"
   document.getElementById("dash-financas").innerHTML = f ? `<div class="quote-row"><span><i>US</i> Dólar</span><b>${moeda(f.dolar)}</b></div><div class="quote-row"><span><i>EU</i> Euro</span><b>${moeda(f.euro)}</b></div><div class="quote-row"><span><i>₿</i> Bitcoin</span><div><b>${moeda(f.bitcoin)}</b>${variacao != null ? `<small class="${classe}">${variacao >= 0 ? "+" : ""}${variacao.toFixed(2)}%</small>` : ""}</div></div>` : `<div class="dash-error">Cotações indisponíveis</div>`
-  document.getElementById("dash-sistema").innerHTML = `<div class="nova-ascii"><span>╭────────╮</span><span>│  N O V A │</span><span>│    ◉     │</span><span>╰────────╯</span></div><div class="system-lines"><div><b>${escapeHTML(s.usuario)}@${escapeHTML(s.hostname)}</b></div><div><span>OS</span>${escapeHTML(s.sistema)}</div><div><span>CPU</span>${escapeHTML(s.processador)}</div><div><span>Cores</span>${s.nucleos}</div><div><span>RAM</span>${s.ram_usada ? `${s.ram_usada} / ${s.ram_total} (${s.ram_percentual}%)` : "instale psutil para monitorar"}</div><div><span>Disk</span>${s.disco_usado} / ${s.disco_total} (${s.disco_percentual}%)</div><div><span>Uptime</span>${formatarUptime(s.uptime_segundos)}</div><div class="terminal-colors"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>`
+  renderizarSystemFetch(s)
   document.getElementById("dashboard-atualizado").textContent = `Atualizado às ${new Date(d.atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
   const tarefas = carregarColecoesDashboard.totalPendentes || 0
   document.querySelector("#dashboard-insight p").innerHTML = `Você tem <b>${tarefas} tarefa${tarefas === 1 ? "" : "s"} pendente${tarefas === 1 ? "" : "s"}</b> hoje.${c ? ` Clima ${escapeHTML(c.descricao.toLowerCase())} em ${escapeHTML(c.cidade)}, ${c.temperatura}°C.` : ""} Boa sessão!`
+}
+function renderizarSystemFetch(s) {
+  if (!s) return
+  const painel = document.getElementById("dash-sistema"); if (!painel) return
+  const cpuPct = Math.max(0, Math.min(100, Number(s.cpu_percentual) || 0))
+  const ramPct = Math.max(0, Math.min(100, Number(s.ram_percentual) || 0))
+  const discoPct = Math.max(0, Math.min(100, Number(s.disco_percentual) || 0))
+  const horario = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  painel.innerHTML = `<div class="system-identity"><div class="system-logo">N</div><div><b>${escapeHTML(s.usuario)}<em>@${escapeHTML(s.hostname)}</em></b><span>${escapeHTML(s.sistema)} · ${escapeHTML(s.arquitetura || "")}</span></div><i class="system-online" title="Última leitura: ${horario}">● AO VIVO · ${horario}</i></div><div class="system-meters"><div class="system-meter"><div><span>CPU</span><b>${cpuPct}%</b></div><i style="--usage:${cpuPct}%"></i><small>${s.nucleos} núcleos · ${escapeHTML(s.processador)}</small></div><div class="system-meter"><div><span>MEMÓRIA</span><b>${ramPct}%</b></div><i style="--usage:${ramPct}%"></i><small>${s.ram_usada ? `${escapeHTML(s.ram_usada)} de ${escapeHTML(s.ram_total)}` : "Monitoramento indisponível"}</small></div><div class="system-meter"><div><span>ARMAZENAMENTO</span><b>${discoPct}%</b></div><i style="--usage:${discoPct}%"></i><small>${escapeHTML(s.disco_usado)} de ${escapeHTML(s.disco_total)}</small></div></div><div class="system-meta"><span><small>UPTIME</small><b>${formatarUptime(s.uptime_segundos)}</b></span><span><small>ARQUITETURA</small><b>${escapeHTML(s.arquitetura || "—")}</b></span><span><small>PYTHON</small><b>${escapeHTML(s.python || "—")}</b></span></div>`
+}
+async function atualizarSystemFetch() {
+  if (atualizarSystemFetch.executando) return
+  atualizarSystemFetch.executando = true
+  try {
+    const resposta = await chamarAPI("get_info_computador")
+    if (resposta.ok) renderizarSystemFetch(resposta.data)
+  } catch (erro) { console.warn("System Fetch:", erro) }
+  finally { atualizarSystemFetch.executando = false }
+}
+function iniciarMonitorSistema() {
+  if (iniciarMonitorSistema.timer) clearInterval(iniciarMonitorSistema.timer)
+  iniciarMonitorSistema.timer = setInterval(atualizarSystemFetch, 5000)
 }
 async function carregarColecoesDashboard() {
   const [tarefasResp, habitosResp] = await Promise.all([chamarAPI("get_tarefas"), chamarAPI("get_habitos")])

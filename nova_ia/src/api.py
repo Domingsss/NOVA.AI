@@ -196,6 +196,13 @@ class API:
             print(f"[NOVA] Dashboard com falhas: {dados['erros']}")
         return self._ok(dados)
 
+    def get_info_computador(self):
+        """Leitura local e leve para o monitor ao vivo do System Fetch."""
+        try:
+            return self._ok(self._info_computador())
+        except Exception as erro:
+            return self._erro(erro)
+
     # ── API Key ───────────────────────────────────────────────────────────────
 
     def get_api_key(self):

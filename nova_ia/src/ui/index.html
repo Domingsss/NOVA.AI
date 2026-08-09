@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css"/>
+<link rel="stylesheet" href="style.css?v=20260809-live-monitor-7"/>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -91,6 +91,7 @@
 <div id="sidebar-resizer"></div>
 
 <main id="conteudo">
+  <div id="chat-particles" aria-hidden="true"></div>
   <header id="app-topbar">
     <button class="topbar-search" onclick="document.getElementById('chat-input').focus(); trocarAba('chat')">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.5" y2="16.5"/></svg>
@@ -162,7 +163,6 @@
         </div>
       </div>
     </div>
-    <div id="chat-particles"></div>
     <div id="chat-msgs"></div>
     <button id="scroll-bottom-btn" onclick="scrollChatBottom()" title="Ir para o final">
       <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
@@ -340,6 +340,6 @@
   <div class="modal-box"><h3>Novo Hábito</h3><input type="text" id="habito-nome" placeholder="Nome do hábito"/><div class="ctrl-linha"><input type="text" id="habito-icone" placeholder="Ícone" value="⭐" style="width:60px"/><input type="color" id="habito-cor" value="#7c6fff"/></div><div class="modal-btns"><button class="btn-secondary" onclick="fecharModal('modal-habito')">Cancelar</button><button class="btn-primary" onclick="criarHabito()">Criar</button></div></div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=20260809-live-monitor-7"></script>
 </body>
 </html>
