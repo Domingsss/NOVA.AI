@@ -9,6 +9,10 @@ import platform
 import shutil
 import socket
 import ssl
+import subprocess
+import tempfile
+import threading
+import wave
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -26,6 +30,10 @@ from rotinas import gerar_resumo_matinal
 
 
 class API:
+
+    def __init__(self):
+        self._gravacao_lock = threading.Lock()
+        self._gravacao = None
 
     # ── Utilitários ───────────────────────────────────────────────────────────
 
@@ -171,9 +179,9 @@ class API:
         resultado["avisos"] = erros
         return resultado
 
-    def get_dashboard(self, cidade: str = "São Paulo"):
+    def get_dashboard(self, cidade: str = "Rio de Janeiro"):
         """Retorna dados independentes; uma fonte fora do ar não derruba o painel."""
-        cidade = (cidade or "São Paulo").strip()[:80]
+        cidade = (cidade or "Rio de Janeiro").strip()[:80]
         dados = {"computador": self._info_computador(), "clima": None, "financas": None,
                  "erros": {}, "atualizado_em": datetime.datetime.now().isoformat(timespec="minutes")}
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -375,6 +383,128 @@ class API:
             return self._ok({"resposta": resposta_completa})
         except Exception as e:
             return self._erro(e)
+
+    def enviar_audio(self, sessao_id: int, audio_b64: str, mime_type: str = "audio/wav"):
+        """Recebe uma gravação curta, interpreta o pedido falado e responde em texto."""
+        try:
+            api_key = carregar_key()
+            if not api_key:
+                return self._erro("API key do Gemini não configurada.")
+            if not audio_b64:
+                return self._erro("Nenhum áudio recebido.")
+            if "," in audio_b64:
+                cabecalho, audio_b64 = audio_b64.split(",", 1)
+                if ":" in cabecalho:
+                    mime_type = cabecalho.split(":", 1)[1].split(";", 1)[0]
+            tamanho = len(base64.b64decode(audio_b64, validate=True))
+            if tamanho > 15 * 1024 * 1024:
+                return self._erro("A gravação passou de 15 MB. Grave uma mensagem mais curta.")
+
+            historico = carregar_historico(sessao_id)
+            conteudo = [
+                {"type": "audio_data", "mime_type": mime_type, "data": audio_b64},
+                {"type": "text", "text": "Interprete o pedido falado neste áudio e responda diretamente em português brasileiro, como em uma conversa por voz."},
+            ]
+            historico.append({"role": "user", "content": conteudo})
+            salvar_mensagem(sessao_id, "user", "[Mensagem de voz]")
+            resposta = chamar_gemini(api_key, historico)
+            salvar_mensagem(sessao_id, "assistant", resposta)
+            self._tentar_renomear_sessao(sessao_id, "Mensagem de voz")
+            return self._ok({"tipo": "texto", "resposta": resposta})
+        except Exception as e:
+            return self._erro(f"Falha na conversa por voz: {e}")
+
+    def iniciar_gravacao_nativa(self):
+        """Inicia captura pelo sistema, sem depender das permissões do WebView."""
+        with self._gravacao_lock:
+            if self._gravacao:
+                return self._erro("Já existe uma gravação em andamento.")
+            try:
+                try:
+                    import sounddevice as sd
+                    frames = []
+
+                    def callback(indata, frame_count, time_info, status):
+                        if status:
+                            print(f"[NOVA] Microfone: {status}")
+                        frames.append(bytes(indata))
+
+                    stream = sd.RawInputStream(
+                        samplerate=16000, channels=1, dtype="int16",
+                        blocksize=2048, callback=callback,
+                    )
+                    stream.start()
+                    self._gravacao = {"tipo": "sounddevice", "stream": stream,
+                                      "frames": frames, "inicio": time.time()}
+                    return self._ok({"backend": "sounddevice"})
+                except ImportError:
+                    if sys.platform.startswith("linux") and shutil.which("arecord"):
+                        arquivo = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                        caminho = arquivo.name
+                        arquivo.close()
+                        processo = subprocess.Popen(
+                            ["arecord", "-q", "-f", "S16_LE", "-r", "16000",
+                             "-c", "1", "-t", "wav", caminho],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                        )
+                        time.sleep(0.15)
+                        if processo.poll() is not None:
+                            erro = processo.stderr.read().decode("utf-8", errors="replace").strip()
+                            try:
+                                os.unlink(caminho)
+                            except OSError:
+                                pass
+                            raise RuntimeError(erro or "Nenhum microfone foi encontrado pelo sistema.")
+                        self._gravacao = {"tipo": "arecord", "processo": processo,
+                                          "caminho": caminho, "inicio": time.time()}
+                        return self._ok({"backend": "arecord"})
+                    raise RuntimeError(
+                        "Instale o suporte nativo com: pip install sounddevice"
+                    )
+            except Exception as e:
+                self._gravacao = None
+                return self._erro(f"Não foi possível abrir o microfone: {e}")
+
+    def parar_gravacao_nativa(self, sessao_id: int):
+        with self._gravacao_lock:
+            gravacao = self._gravacao
+            self._gravacao = None
+        if not gravacao:
+            return self._erro("Nenhuma gravação em andamento.")
+        try:
+            duracao = time.time() - gravacao["inicio"]
+            if gravacao["tipo"] == "sounddevice":
+                stream = gravacao["stream"]
+                stream.stop(); stream.close()
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as arquivo:
+                    caminho = arquivo.name
+                with wave.open(caminho, "wb") as wav:
+                    wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000)
+                    wav.writeframes(b"".join(gravacao["frames"]))
+            else:
+                processo = gravacao["processo"]
+                processo.terminate()
+                try:
+                    processo.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    processo.kill(); processo.wait()
+                caminho = gravacao["caminho"]
+                if processo.returncode not in (0, -15):
+                    erro = processo.stderr.read().decode("utf-8", errors="replace").strip()
+                    raise RuntimeError(erro or "O gravador do sistema falhou.")
+            if duracao < 0.5 or not os.path.exists(caminho) or os.path.getsize(caminho) < 100:
+                raise RuntimeError("A gravação ficou vazia ou curta demais.")
+            with open(caminho, "rb") as arquivo:
+                audio_b64 = base64.b64encode(arquivo.read()).decode("ascii")
+            return self.enviar_audio(sessao_id, audio_b64, "audio/wav")
+        except Exception as e:
+            return self._erro(f"Falha ao finalizar a gravação: {e}")
+        finally:
+            if "caminho" in locals() and os.path.exists(caminho):
+                try:
+                    os.unlink(caminho)
+                except OSError:
+                    pass
 
     def _tentar_acao_agente(self, sessao_id: int, mensagem: str):
         """Detecta se a mensagem é um pedido de ação (criar tarefa/lembrete,

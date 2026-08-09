@@ -41,6 +41,12 @@ def _parte_gemini(parte):
         dados = base64.b64encode(base64.b64decode(dados, validate=True)).decode("ascii")
         return {"inlineData": {"mimeType": mime_type, "data": dados}}
 
+    if tipo == "audio_data":
+        mime_type = parte.get("mime_type", "audio/wav")
+        dados = parte.get("data", "")
+        dados = base64.b64encode(base64.b64decode(dados, validate=True)).decode("ascii")
+        return {"inlineData": {"mimeType": mime_type, "data": dados}}
+
     raise ValueError(f"Tipo de conteúdo não suportado: {tipo}")
 
 

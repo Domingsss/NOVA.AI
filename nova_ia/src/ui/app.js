@@ -8,10 +8,86 @@ let imagemAtual = null
 let settings = { particles: true, animations: true, theme: "light" }
 let ultimaMsgNova = null
 let contextMsgEl = null
-let cidadeDashboard = "São Paulo"
+let cidadeDashboard = "Rio de Janeiro"
+let gravadorVoz = null
+let gravandoVoz = false
+let vozNovaAtiva = true
+let modoGravacaoVoz = "native"
+let timerGravacaoVoz = null
 
 function storageGet(chave, fallback = null) { try { return window.localStorage.getItem(chave) || fallback } catch (e) { return fallback } }
 function storageSet(chave, valor) { try { window.localStorage.setItem(chave, valor) } catch (e) { console.warn("Armazenamento local indisponível:", e) } }
+
+function atualizarControlesVoz() {
+  document.querySelectorAll("#chat-mic,#topbar-mic").forEach(el => el?.classList.toggle("recording", gravandoVoz))
+  const voz = document.getElementById("topbar-voice"); if (voz) { voz.classList.toggle("muted", !vozNovaAtiva); voz.title = vozNovaAtiva ? "Silenciar voz da NOVA" : "Ativar voz da NOVA" }
+}
+function toggleVozNova() {
+  vozNovaAtiva = !vozNovaAtiva; storageSet("novaVozAtiva", vozNovaAtiva ? "1" : "0")
+  if (!vozNovaAtiva && "speechSynthesis" in window) speechSynthesis.cancel()
+  atualizarControlesVoz(); showToast(vozNovaAtiva ? "Voz da NOVA ativada" : "Voz da NOVA silenciada", "", "info", 1800)
+}
+function falarResposta(texto) {
+  if (!vozNovaAtiva || !("speechSynthesis" in window)) return
+  speechSynthesis.cancel(); const tmp = document.createElement("div"); tmp.innerHTML = renderMarkdown(texto)
+  const fala = new SpeechSynthesisUtterance(tmp.textContent.replace(/\s+/g, " ").trim()); fala.lang = "pt-BR"; fala.rate = 1.04; fala.pitch = .96
+  const vozes = speechSynthesis.getVoices(); fala.voice = vozes.find(v => v.lang?.toLowerCase() === "pt-br" && /female|francisca|maria|leticia/i.test(v.name)) || vozes.find(v => v.lang?.toLowerCase().startsWith("pt")) || null
+  speechSynthesis.speak(fala)
+}
+function criarWav(amostras, sampleRate) {
+  const total = amostras.reduce((n, a) => n + a.length, 0), buffer = new ArrayBuffer(44 + total * 2), view = new DataView(buffer)
+  const texto = (offset, valor) => { for (let i = 0; i < valor.length; i++) view.setUint8(offset + i, valor.charCodeAt(i)) }
+  texto(0,"RIFF"); view.setUint32(4,36 + total * 2,true); texto(8,"WAVE"); texto(12,"fmt "); view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true); view.setUint32(24,sampleRate,true); view.setUint32(28,sampleRate * 2,true); view.setUint16(32,2,true); view.setUint16(34,16,true); texto(36,"data"); view.setUint32(40,total * 2,true)
+  let pos = 44; amostras.forEach(bloco => bloco.forEach(valor => { const v = Math.max(-1, Math.min(1, valor)); view.setInt16(pos, v < 0 ? v * 0x8000 : v * 0x7fff, true); pos += 2 }))
+  return new Blob([view], { type: "audio/wav" })
+}
+async function toggleGravacao() { if (gravandoVoz) return pararGravacaoNativa(); return iniciarGravacaoNativa() }
+async function iniciarGravacaoNativa() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel()
+  if (!sessaoAtual) await novaConversa()
+  const r = await chamarAPI("iniciar_gravacao_nativa")
+  if (!r.ok) { showToast("Microfone indisponível", r.erro, "error", 7000); return }
+  modoGravacaoVoz = "native"; gravandoVoz = true; atualizarControlesVoz(); trocarAba("chat")
+  timerGravacaoVoz = setTimeout(() => { if (gravandoVoz) pararGravacaoNativa() }, 60000)
+  document.getElementById("voice-status").textContent = "● Ouvindo pelo microfone do sistema... clique novamente para enviar"
+}
+async function pararGravacaoNativa() {
+  if (!gravandoVoz) return; gravandoVoz = false; atualizarControlesVoz()
+  if (timerGravacaoVoz) clearTimeout(timerGravacaoVoz); timerGravacaoVoz = null
+  document.getElementById("voice-status").textContent = "Processando mensagem de voz..."; adicionarTyping()
+  const r = await chamarAPI("parar_gravacao_nativa", sessaoAtual); removerTyping(); document.getElementById("voice-status").textContent = ""
+  if (r.ok) { adicionarMensagem("user", "🎙 Mensagem de voz"); adicionarMensagem("nova", r.data.resposta); falarResposta(r.data.resposta); await carregarSessoes(); marcarSessaoAtiva(sessaoAtual) }
+  else { showToast("Erro na conversa por voz", r.erro, "error", 7000); adicionarMensagem("nova", `❌ ${r.erro}`) }
+}
+async function iniciarGravacao() {
+  if (!window.isSecureContext) { showToast("Microfone bloqueado", "A interface não foi aberta em um contexto seguro. Reinicie a NOVA pelo main.py.", "error", 6000); return }
+  if (!navigator.mediaDevices?.getUserMedia) { showToast("Microfone indisponível", "É necessário o Microsoft Edge WebView2 Runtime atualizado.", "error", 6000); return }
+  try {
+    if ("speechSynthesis" in window) speechSynthesis.cancel()
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    const AudioCtx = window.AudioContext || window.webkitAudioContext, contexto = new AudioCtx(), fonte = contexto.createMediaStreamSource(stream), processador = contexto.createScriptProcessor(4096, 1, 1), amostras = []
+    processador.onaudioprocess = e => { if (gravandoVoz) amostras.push(new Float32Array(e.inputBuffer.getChannelData(0))) }
+    fonte.connect(processador); processador.connect(contexto.destination)
+    gravadorVoz = { stream, contexto, fonte, processador, amostras, inicio: Date.now(), limite: setTimeout(() => { if (gravandoVoz) pararGravacao() }, 60000) }
+    gravandoVoz = true; atualizarControlesVoz(); document.getElementById("voice-status").textContent = "● Ouvindo... clique novamente para enviar"
+    trocarAba("chat")
+  } catch (e) { showToast("Não consegui usar o microfone", e.message || String(e), "error", 5000) }
+}
+async function pararGravacao() {
+  if (!gravadorVoz) return; gravandoVoz = false; atualizarControlesVoz(); clearTimeout(gravadorVoz.limite)
+  gravadorVoz.processador.disconnect(); gravadorVoz.fonte.disconnect(); gravadorVoz.stream.getTracks().forEach(t => t.stop()); await gravadorVoz.contexto.close()
+  const duracao = (Date.now() - gravadorVoz.inicio) / 1000, status = document.getElementById("voice-status")
+  if (duracao < .5 || !gravadorVoz.amostras.length) { status.textContent = "Gravação muito curta"; gravadorVoz = null; return }
+  const blob = criarWav(gravadorVoz.amostras, gravadorVoz.contexto.sampleRate); gravadorVoz = null; status.textContent = "Enviando mensagem de voz..."
+  const leitor = new FileReader(); leitor.onload = async () => enviarMensagemVoz(leitor.result, duracao); leitor.readAsDataURL(blob)
+}
+async function enviarMensagemVoz(audioData, duracao) {
+  if (!sessaoAtual) await novaConversa()
+  const msgs = document.getElementById("chat-msgs"), div = document.createElement("div"); div.className = "msg user voice-message"; div.innerHTML = `<div class="msg-content"><div class="bubble"><span class="voice-wave">▂▄▆█▆▄▂</span><span>Mensagem de voz · ${Math.round(duracao)}s</span></div><div class="msg-meta">${agoraHora()}</div></div>`; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight
+  adicionarTyping(); const r = await chamarAPI("enviar_audio", sessaoAtual, audioData, "audio/wav"); removerTyping(); document.getElementById("voice-status").textContent = ""
+  if (r.ok) { adicionarMensagem("nova", r.data.resposta); falarResposta(r.data.resposta); await carregarSessoes(); marcarSessaoAtiva(sessaoAtual) }
+  else { adicionarMensagem("nova", `❌ ${r.erro}`); showToast("Erro na conversa por voz", r.erro, "error", 5000) }
+}
 
 async function chamarAPI(fn, ...args) {
   try { const raw = await window.pywebview.api[fn](...args); return JSON.parse(raw) }
@@ -79,7 +155,7 @@ window.addEventListener("pywebviewready", async () => {
   try { const r = await chamarAPI("carregar_tema"); if (r.ok) aplicarTema(r.data.tema || "light"); else aplicarTema("light") } catch (e) { aplicarTema("light") }
   criarParticulas()
   document.querySelectorAll(".nav-btn").forEach(b => b.addEventListener("click", () => trocarAba(b.dataset.aba)))
-  document.getElementById("btn-nova-conversa").addEventListener("click", novaConversa)
+  document.getElementById("btn-nova-conversa").addEventListener("click", async () => { await novaConversa(); trocarAba("chat") })
   document.getElementById("chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMensagem() } })
   document.getElementById("chat-send").addEventListener("click", enviarMensagem)
   document.getElementById("cor-fundo").addEventListener("input", e => document.getElementById("cor-fundo-label").textContent = e.target.value)
@@ -87,7 +163,9 @@ window.addEventListener("pywebviewready", async () => {
   cm.addEventListener("scroll", () => { const b = document.getElementById("scroll-bottom-btn"); b.classList.toggle("visible", cm.scrollHeight - cm.scrollTop - cm.clientHeight > 80) })
   document.addEventListener("click", () => document.getElementById("context-menu").classList.remove("visible"))
   setupSidebarDrag(); document.addEventListener("keydown", handleAtalhos)
-  cidadeDashboard = storageGet("novaCidade", "São Paulo")
+  cidadeDashboard = storageGet("novaCidade", "Rio de Janeiro")
+  if (cidadeDashboard === "São Paulo") { cidadeDashboard = "Rio de Janeiro"; storageSet("novaCidade", cidadeDashboard) }
+  vozNovaAtiva = storageGet("novaVozAtiva", "1") !== "0"; atualizarControlesVoz()
   document.getElementById("input-cidade").value = cidadeDashboard
   try { await carregarDashboard() } catch (e) { console.error(e); mostrarErroDashboard(String(e)) }
   try { await abrirUltimaConversa() } catch (e) { console.error(e) }
@@ -99,7 +177,7 @@ window.addEventListener("pywebviewready", async () => {
 
 function handleAtalhos(e) {
   if (e.ctrlKey || e.metaKey) {
-    if (e.key === "k" || e.key === "K") { e.preventDefault(); novaConversa(); showToast("Nova conversa", "", "info", 1500) }
+    if (e.key === "k" || e.key === "K") { e.preventDefault(); novaConversa(); trocarAba("chat"); showToast("Nova conversa", "", "info", 1500) }
     else if (e.key === "/") { e.preventDefault(); const h = document.getElementById("shortcut-hint"); h.classList.add("visible"); setTimeout(() => h.classList.remove("visible"), 2500) }
     else if (e.key === "b" || e.key === "B") { e.preventDefault(); toggleSidebar() }
   }
@@ -121,7 +199,7 @@ async function atualizarKeyDot() {
 }
 function trocarAba(aba) {
   document.querySelectorAll(".aba").forEach(a => a.classList.remove("active")); document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"))
-  document.getElementById(`aba-${aba}`).classList.add("active"); document.querySelector(`[data-aba="${aba}"]`).classList.add("active")
+  document.getElementById(`aba-${aba}`).classList.add("active"); const nav = document.querySelector(`[data-aba="${aba}"]`); if (nav) nav.classList.add("active")
   if (aba === "dashboard") carregarDashboard(); if (aba === "tarefas") carregarTarefas(); if (aba === "lembretes") carregarLembretes(); if (aba === "habitos") carregarHabitos(); if (aba === "foco") atualizarStatsFoco()
 }
 
@@ -137,11 +215,12 @@ function mostrarErroDashboard(erro) {
 async function carregarDashboard(forcar = false) {
   if (!forcar && carregarDashboard.carregando) return
   carregarDashboard.carregando = true
+  carregarColecoesDashboard()
   const agora = new Date(); const hora = agora.getHours(); const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite"
   document.getElementById("dashboard-saudacao").textContent = `${saudacao}, chefe.`
   document.getElementById("dashboard-data").textContent = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
   if (forcar) { document.getElementById("dash-clima").textContent = "Atualizando..."; document.getElementById("dash-financas").textContent = "Atualizando..." }
-  const cidade = cidadeDashboard || "São Paulo"
+  const cidade = cidadeDashboard || "Rio de Janeiro"
   const r = await chamarAPI("get_dashboard", cidade); carregarDashboard.carregando = false
   if (!r.ok) { mostrarErroDashboard(r.erro); showToast("Dashboard indisponível", r.erro, "error"); return }
   const d = r.data, c = d.clima, f = d.financas, s = d.computador
@@ -150,6 +229,24 @@ async function carregarDashboard(forcar = false) {
   document.getElementById("dash-financas").innerHTML = f ? `<div class="quote-row"><span><i>US</i> Dólar</span><b>${moeda(f.dolar)}</b></div><div class="quote-row"><span><i>EU</i> Euro</span><b>${moeda(f.euro)}</b></div><div class="quote-row"><span><i>₿</i> Bitcoin</span><div><b>${moeda(f.bitcoin)}</b>${variacao != null ? `<small class="${classe}">${variacao >= 0 ? "+" : ""}${variacao.toFixed(2)}%</small>` : ""}</div></div>` : `<div class="dash-error">Cotações indisponíveis</div>`
   document.getElementById("dash-sistema").innerHTML = `<div class="nova-ascii"><span>╭────────╮</span><span>│  N O V A │</span><span>│    ◉     │</span><span>╰────────╯</span></div><div class="system-lines"><div><b>${escapeHTML(s.usuario)}@${escapeHTML(s.hostname)}</b></div><div><span>OS</span>${escapeHTML(s.sistema)}</div><div><span>CPU</span>${escapeHTML(s.processador)}</div><div><span>Cores</span>${s.nucleos}</div><div><span>RAM</span>${s.ram_usada ? `${s.ram_usada} / ${s.ram_total} (${s.ram_percentual}%)` : "instale psutil para monitorar"}</div><div><span>Disk</span>${s.disco_usado} / ${s.disco_total} (${s.disco_percentual}%)</div><div><span>Uptime</span>${formatarUptime(s.uptime_segundos)}</div><div class="terminal-colors"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>`
   document.getElementById("dashboard-atualizado").textContent = `Atualizado às ${new Date(d.atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+  const tarefas = carregarColecoesDashboard.totalPendentes || 0
+  document.querySelector("#dashboard-insight p").innerHTML = `Você tem <b>${tarefas} tarefa${tarefas === 1 ? "" : "s"} pendente${tarefas === 1 ? "" : "s"}</b> hoje.${c ? ` Clima ${escapeHTML(c.descricao.toLowerCase())} em ${escapeHTML(c.cidade)}, ${c.temperatura}°C.` : ""} Boa sessão!`
+}
+async function carregarColecoesDashboard() {
+  const [tarefasResp, habitosResp] = await Promise.all([chamarAPI("get_tarefas"), chamarAPI("get_habitos")])
+  if (tarefasResp.ok) {
+    const tarefas = tarefasResp.data || [], pendentes = tarefas.filter(t => t.status === "pendente"), concluidas = tarefas.filter(t => t.status === "concluida")
+    carregarColecoesDashboard.totalPendentes = pendentes.length
+    const total = tarefas.length, feitos = concluidas.length, progresso = total ? Math.round(feitos / total * 100) : 0
+    const barra = document.getElementById("dash-task-progress"); barra.querySelector("i").style.setProperty("--progress", `${progresso}%`); barra.querySelector("span").textContent = `${feitos}/${total}`
+    const lista = document.getElementById("dash-tarefas")
+    const itens = [...pendentes, ...concluidas].slice(0, 4)
+    lista.innerHTML = itens.length ? itens.map(t => { const done = t.status === "concluida", cor = { alta: "#ff5263", media: "#ffad1f", baixa: "#778096" }[t.prioridade] || "#778096"; return `<div class="dashboard-row ${done ? "done" : ""}" onclick="trocarAba('tarefas')"><span class="dashboard-check">✓</span><span class="dashboard-row-name">${escapeHTML(t.titulo)}</span><i class="priority-dot" style="background:${cor}"></i></div>` }).join("") : `<div class="dash-error">Nenhuma tarefa. Estranhamente organizado, chefe.</div>`
+  } else document.getElementById("dash-tarefas").innerHTML = `<div class="dash-error">Tarefas indisponíveis</div>`
+  if (habitosResp.ok) {
+    const habitos = (habitosResp.data || []).slice(0, 4), lista = document.getElementById("dash-habitos")
+    lista.innerHTML = habitos.length ? habitos.map(h => `<div class="dashboard-row" onclick="trocarAba('habitos')"><span class="dashboard-habit-icon">${escapeHTML(h.icone)}</span><div class="habit-data"><div>${escapeHTML(h.nome)} <small>↻ ${h.streak}d</small></div><span class="habit-dots">${Array.from({length:7},(_,i)=>`<i class="${i < Math.min(h.streak,7) ? "on" : ""}"></i>`).join("")}</span></div><span class="dashboard-check ${h.feito_hoje ? "done" : ""}">${h.feito_hoje ? "✓" : ""}</span></div>`).join("") : `<div class="dash-error">Nenhum hábito cadastrado.</div>`
+  } else document.getElementById("dash-habitos").innerHTML = `<div class="dash-error">Hábitos indisponíveis</div>`
 }
 async function abrirUltimaConversa() {
   const r = await chamarAPI("get_sessoes"); if (!r.ok || !r.data || !r.data.length) { await novaConversa(); return }
@@ -219,7 +316,7 @@ window.__novaErro = function(msg) { if (!document.getElementById("streaming-bubb
 window.__novaAgenteAcao = function(tipo, desc) { const ic = { tarefa: "✅", lembrete: "⏰", listar: "📋" }; showToast(`${ic[tipo] || "✨"} Ação executada`, desc, "success", 3000); atualizarBadges() }
 function abrirModalConfig() { document.getElementById("modal-config").style.display = "flex"; atualizarKeyDot() }
 function toggleSetting(key, el) { el.classList.toggle("on"); settings[key] = el.classList.contains("on"); if (key === "particles") criarParticulas() }
-async function salvarConfig() { const k = document.getElementById("input-key").value.trim(); cidadeDashboard = document.getElementById("input-cidade").value.trim() || "São Paulo"; storageSet("novaCidade", cidadeDashboard); if (k) { await chamarAPI("salvar_api_key", k); showToast("API Key salva!", "", "success", 2000) } fecharModal("modal-config"); await atualizarKeyDot(); carregarDashboard(true) }
+async function salvarConfig() { const k = document.getElementById("input-key").value.trim(); cidadeDashboard = document.getElementById("input-cidade").value.trim() || "Rio de Janeiro"; storageSet("novaCidade", cidadeDashboard); if (k) { await chamarAPI("salvar_api_key", k); showToast("API Key salva!", "", "success", 2000) } fecharModal("modal-config"); await atualizarKeyDot(); carregarDashboard(true) }
 function mostrarSkeleton(lista, n = 3) { lista.innerHTML = ""; for (let i = 0; i < n; i++) { const s = document.createElement("div"); s.className = "skeleton-card"; s.innerHTML = `<div style="flex:1"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>`; lista.appendChild(s) } }
 async function carregarTarefas() {
   const l = document.getElementById("lista-tarefas"); mostrarSkeleton(l); const r = await chamarAPI("get_tarefas"); if (!r.ok) { l.innerHTML = ""; return }

@@ -51,7 +51,18 @@ def main():
     )
 
     print("[NOVA] Abrindo janela...")
-    webview.start(debug=False)  # Mude debug para False quando for distribuir
+    # O microfone via getUserMedia exige um contexto HTTP local e um motor web
+    # moderno. No Windows, força WebView2 (Edge Chromium) em vez do MSHTML.
+    gui = "edgechromium" if sys.platform == "win32" else None
+    storage_dir = os.path.join(os.path.dirname(SRC_DIR), "data", "webview")
+    os.makedirs(storage_dir, exist_ok=True)
+    webview.start(
+        debug=False,
+        gui=gui,
+        http_server=True,
+        private_mode=False,
+        storage_path=storage_dir,
+    )
     print("[NOVA] Janela fechada. Fim.")
 
 
