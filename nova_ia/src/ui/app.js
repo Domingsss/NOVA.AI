@@ -12,8 +12,19 @@ let cidadeDashboard = "Rio de Janeiro"
 let gravadorVoz = null
 let gravandoVoz = false
 let vozNovaAtiva = true
+let vozesTTS = []
 let modoGravacaoVoz = "native"
 let timerGravacaoVoz = null
+
+function carregarVozesTTS() {
+  if (!("speechSynthesis" in window)) return
+  const vozes = speechSynthesis.getVoices()
+  if (vozes.length) vozesTTS = vozes
+}
+if ("speechSynthesis" in window) {
+  carregarVozesTTS()
+  speechSynthesis.addEventListener("voiceschanged", carregarVozesTTS)
+}
 
 function storageGet(chave, fallback = null) { try { return window.localStorage.getItem(chave) || fallback } catch (e) { return fallback } }
 function storageSet(chave, valor) { try { window.localStorage.setItem(chave, valor) } catch (e) { console.warn("Armazenamento local indisponível:", e) } }
@@ -29,9 +40,17 @@ function toggleVozNova() {
 }
 function falarResposta(texto) {
   if (!vozNovaAtiva || !("speechSynthesis" in window)) return
-  speechSynthesis.cancel(); const tmp = document.createElement("div"); tmp.innerHTML = renderMarkdown(texto)
-  const fala = new SpeechSynthesisUtterance(tmp.textContent.replace(/\s+/g, " ").trim()); fala.lang = "pt-BR"; fala.rate = 1.04; fala.pitch = .96
-  const vozes = speechSynthesis.getVoices(); fala.voice = vozes.find(v => v.lang?.toLowerCase() === "pt-br" && /female|francisca|maria|leticia/i.test(v.name)) || vozes.find(v => v.lang?.toLowerCase().startsWith("pt")) || null
+  speechSynthesis.cancel()
+  const tmp = document.createElement("div")
+  tmp.innerHTML = renderMarkdown(texto)
+  const fala = new SpeechSynthesisUtterance(tmp.textContent.replace(/\s+/g, " ").trim())
+  fala.lang = "pt-BR"
+  fala.rate = 1.04
+  fala.pitch = .96
+  const vozes = vozesTTS.length ? vozesTTS : speechSynthesis.getVoices()
+  fala.voice = vozes.find(v => v.lang?.toLowerCase() === "pt-br" && /female|francisca|maria|leticia/i.test(v.name))
+    || vozes.find(v => v.lang?.toLowerCase().startsWith("pt"))
+    || null
   speechSynthesis.speak(fala)
 }
 function criarWav(amostras, sampleRate) {
@@ -41,27 +60,54 @@ function criarWav(amostras, sampleRate) {
   let pos = 44; amostras.forEach(bloco => bloco.forEach(valor => { const v = Math.max(-1, Math.min(1, valor)); view.setInt16(pos, v < 0 ? v * 0x8000 : v * 0x7fff, true); pos += 2 }))
   return new Blob([view], { type: "audio/wav" })
 }
-async function toggleGravacao() { if (gravandoVoz) return pararGravacaoNativa(); return iniciarGravacaoNativa() }
-async function iniciarGravacaoNativa() {
+async function toggleGravacao() {
+  if (gravandoVoz) return modoGravacaoVoz === "browser" ? pararGravacao() : pararGravacaoNativa()
+  return iniciarGravacaoComFallback()
+}
+async function iniciarGravacaoComFallback() {
   if ("speechSynthesis" in window) speechSynthesis.cancel()
   if (!sessaoAtual) await novaConversa()
   const r = await chamarAPI("iniciar_gravacao_nativa")
-  if (!r.ok) { showToast("Microfone indisponível", r.erro, "error", 7000); return }
-  modoGravacaoVoz = "native"; gravandoVoz = true; atualizarControlesVoz(); trocarAba("chat")
+  if (r.ok) return iniciarGravacaoNativaPos(r.data?.backend || "native")
+  if (window.isSecureContext && navigator.mediaDevices?.getUserMedia) {
+    showToast("Usando microfone do navegador", r.erro, "info", 4500)
+    return iniciarGravacao()
+  }
+  showToast("Microfone indisponível", r.erro, "error", 7000)
+}
+function iniciarGravacaoNativaPos(backend) {
+  modoGravacaoVoz = "native"
+  gravandoVoz = true
+  atualizarControlesVoz()
+  trocarAba("chat")
   timerGravacaoVoz = setTimeout(() => { if (gravandoVoz) pararGravacaoNativa() }, 60000)
-  document.getElementById("voice-status").textContent = "● Ouvindo pelo microfone do sistema... clique novamente para enviar"
+  const label = backend === "arecord" ? "sistema (ALSA)" : "sistema"
+  document.getElementById("voice-status").textContent = `● Ouvindo pelo microfone do ${label}... clique novamente para enviar`
+}
+async function iniciarGravacaoNativa() {
+  const r = await chamarAPI("iniciar_gravacao_nativa")
+  if (!r.ok) { showToast("Microfone indisponível", r.erro, "error", 7000); return }
+  iniciarGravacaoNativaPos(r.data?.backend || "native")
 }
 async function pararGravacaoNativa() {
   if (!gravandoVoz) return; gravandoVoz = false; atualizarControlesVoz()
   if (timerGravacaoVoz) clearTimeout(timerGravacaoVoz); timerGravacaoVoz = null
   document.getElementById("voice-status").textContent = "Processando mensagem de voz..."; adicionarTyping()
   const r = await chamarAPI("parar_gravacao_nativa", sessaoAtual); removerTyping(); document.getElementById("voice-status").textContent = ""
-  if (r.ok) { adicionarMensagem("user", "🎙 Mensagem de voz"); adicionarMensagem("nova", r.data.resposta); falarResposta(r.data.resposta); await carregarSessoes(); marcarSessaoAtiva(sessaoAtual) }
+  if (r.ok) {
+    const textoUser = r.data.transcricao ? `🎙 ${r.data.transcricao}` : "🎙 Mensagem de voz"
+    adicionarMensagem("user", textoUser)
+    adicionarMensagem("nova", r.data.resposta)
+    falarResposta(r.data.resposta)
+    await carregarSessoes()
+    marcarSessaoAtiva(sessaoAtual)
+  }
   else { showToast("Erro na conversa por voz", r.erro, "error", 7000); adicionarMensagem("nova", `❌ ${r.erro}`) }
 }
 async function iniciarGravacao() {
   if (!window.isSecureContext) { showToast("Microfone bloqueado", "A interface não foi aberta em um contexto seguro. Reinicie a NOVA pelo main.py.", "error", 6000); return }
-  if (!navigator.mediaDevices?.getUserMedia) { showToast("Microfone indisponível", "É necessário o Microsoft Edge WebView2 Runtime atualizado.", "error", 6000); return }
+  if (!navigator.mediaDevices?.getUserMedia) { showToast("Microfone indisponível", "É necessário um navegador moderno com suporte a microfone.", "error", 6000); return }
+  if (!sessaoAtual) await novaConversa()
   try {
     if ("speechSynthesis" in window) speechSynthesis.cancel()
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
@@ -69,7 +115,8 @@ async function iniciarGravacao() {
     processador.onaudioprocess = e => { if (gravandoVoz) amostras.push(new Float32Array(e.inputBuffer.getChannelData(0))) }
     fonte.connect(processador); processador.connect(contexto.destination)
     gravadorVoz = { stream, contexto, fonte, processador, amostras, inicio: Date.now(), limite: setTimeout(() => { if (gravandoVoz) pararGravacao() }, 60000) }
-    gravandoVoz = true; atualizarControlesVoz(); document.getElementById("voice-status").textContent = "● Ouvindo... clique novamente para enviar"
+    modoGravacaoVoz = "browser"; gravandoVoz = true; atualizarControlesVoz()
+    document.getElementById("voice-status").textContent = "● Ouvindo... clique novamente para enviar"
     trocarAba("chat")
   } catch (e) { showToast("Não consegui usar o microfone", e.message || String(e), "error", 5000) }
 }
@@ -85,7 +132,13 @@ async function enviarMensagemVoz(audioData, duracao) {
   if (!sessaoAtual) await novaConversa()
   const msgs = document.getElementById("chat-msgs"), div = document.createElement("div"); div.className = "msg user voice-message"; div.innerHTML = `<div class="msg-content"><div class="bubble"><span class="voice-wave">▂▄▆█▆▄▂</span><span>Mensagem de voz · ${Math.round(duracao)}s</span></div><div class="msg-meta">${agoraHora()}</div></div>`; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight
   adicionarTyping(); const r = await chamarAPI("enviar_audio", sessaoAtual, audioData, "audio/wav"); removerTyping(); document.getElementById("voice-status").textContent = ""
-  if (r.ok) { adicionarMensagem("nova", r.data.resposta); falarResposta(r.data.resposta); await carregarSessoes(); marcarSessaoAtiva(sessaoAtual) }
+  if (r.ok) {
+    const textoUser = r.data.transcricao ? `🎙 ${r.data.transcricao}` : `Mensagem de voz · ${Math.round(duracao)}s`
+    adicionarMensagem("nova", r.data.resposta)
+    falarResposta(r.data.resposta)
+    await carregarSessoes()
+    marcarSessaoAtiva(sessaoAtual)
+  }
   else { adicionarMensagem("nova", `❌ ${r.erro}`); showToast("Erro na conversa por voz", r.erro, "error", 5000) }
 }
 
@@ -417,3 +470,20 @@ async function aplicarEdicaoTexto() {
 }
 function fecharModal(id) { document.getElementById(id).style.display = "none" }
 document.addEventListener("click", e => { if (e.target.classList.contains("modal")) e.target.style.display = "none" })
+
+  import { GoogleGenAI } from '@google/genai';
+
+const client = new GoogleGenAI({});
+
+let interaction = await client.interactions.create({
+    model: 'gemini-3.6-flash',
+    input: 'Hi, my name is Phil.'
+});
+console.log("Response 1:", interaction.output_text);
+
+interaction = await client.interactions.create({
+    model: 'gemini-3.6-flash',
+    previous_interaction_id: interaction.id,
+    input: 'What is my name?'
+});
+console.log("Response 2:", interaction.output_text);

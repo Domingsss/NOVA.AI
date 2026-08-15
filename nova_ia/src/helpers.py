@@ -6,7 +6,7 @@ import time
 import urllib.error
 import urllib.request
 
-from config import API_KEY_FILE, FALLBACK_MODEL, GEMINI_API_URL, MODEL, SYSTEM_PROMPT
+from config import API_KEY_FILE, AUDIO_MODELS, FALLBACK_MODEL, GEMINI_API_URL, MODEL, SYSTEM_PROMPT
 
 
 def salvar_key(key: str):
@@ -150,6 +150,39 @@ def _traduzir_erro_api(erro: urllib.error.HTTPError) -> RuntimeError:
     except Exception:
         mensagem = str(erro)
     return RuntimeError(f"Gemini API: {mensagem}")
+
+
+def chamar_gemini_multimodal(api_key: str, historico: list, max_tokens: int = 512) -> str:
+    """Chama o Gemini com conteúdo multimodal (áudio/imagem), tentando modelos compatíveis."""
+    payload = _payload(historico, SYSTEM_PROMPT, max_tokens)
+    ultimo_erro = None
+    modelos = tuple(dict.fromkeys(AUDIO_MODELS))
+    for indice, model in enumerate(modelos):
+        tentativas = 3 if indice > 0 else 2
+        for tentativa in range(tentativas):
+            try:
+                with _requisicao(api_key, "generateContent", payload, model) as resposta:
+                    return _texto_resposta(json.load(resposta))
+            except urllib.error.HTTPError as erro:
+                ultimo_erro = erro
+                # Modelo pode não aceitar áudio — tenta o próximo.
+                if erro.code == 400:
+                    break
+                if erro.code not in (408, 429, 500, 502, 503, 504):
+                    raise _traduzir_erro_api(erro) from erro
+                if tentativa < tentativas - 1:
+                    time.sleep((2 ** tentativa) + random.uniform(0.1, 0.5))
+            except urllib.error.URLError as erro:
+                ultimo_erro = erro
+                if tentativa < tentativas - 1:
+                    time.sleep((2 ** tentativa) + random.uniform(0.1, 0.5))
+        if indice == 0 and len(modelos) > 1:
+            print(f"[NOVA] Modelo principal sem suporte a áudio; tentando {modelos[1]}.")
+    if isinstance(ultimo_erro, urllib.error.HTTPError):
+        raise _traduzir_erro_api(ultimo_erro) from ultimo_erro
+    if ultimo_erro:
+        raise RuntimeError(f"Não foi possível conectar ao Gemini: {ultimo_erro}") from ultimo_erro
+    raise RuntimeError("Nenhum modelo disponível aceitou o áudio enviado.")
 
 
 def chamar_gemini(api_key: str, historico: list) -> str:

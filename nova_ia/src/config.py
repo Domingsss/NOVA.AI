@@ -33,4 +33,6 @@ Se pedir prompt de imagem: gere prompts em inglês, detalhados e otimizados para
 Se pedir organização: seja prática e objetiva."""
 MODEL = "gemini-3.6-flash"
 FALLBACK_MODEL = "gemini-3.5-flash-lite"
+# Modelos testados em ordem para entrada de áudio (multimodal).
+AUDIO_MODELS = ("gemini-2.0-flash", MODEL, "gemini-1.5-flash", FALLBACK_MODEL)
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta"

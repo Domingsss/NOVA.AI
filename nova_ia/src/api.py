@@ -7,6 +7,7 @@ import datetime
 import getpass
 import platform
 import shutil
+import signal
 import socket
 import ssl
 import subprocess
@@ -16,7 +17,7 @@ import wave
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from helpers import carregar_key, salvar_key, chamar_gemini, chamar_gemini_simples, chamar_gemini_stream
+from helpers import carregar_key, salvar_key, chamar_gemini, chamar_gemini_multimodal, chamar_gemini_simples, chamar_gemini_stream
 from database import (
     criar_sessao, listar_sessoes, renomear_sessao, deletar_sessao,
     salvar_mensagem, carregar_historico, limpar_historico,
@@ -391,8 +392,26 @@ class API:
         except Exception as e:
             return self._erro(e)
 
+    def _transcrever_audio(self, api_key: str, audio_b64: str, mime_type: str = "audio/wav") -> str:
+        """Converte a gravação em texto para alimentar o chat e ações do agente."""
+        historico = [{
+            "role": "user",
+            "content": [
+                {"type": "audio_data", "mime_type": mime_type, "data": audio_b64},
+                {
+                    "type": "text",
+                    "text": (
+                        "Transcreva exatamente o que a pessoa falou neste áudio, em português brasileiro. "
+                        "Responda somente com a transcrição literal, sem aspas, explicações ou pontuação extra."
+                    ),
+                },
+            ],
+        }]
+        texto = chamar_gemini_multimodal(api_key, historico, max_tokens=256)
+        return " ".join(texto.split()).strip()
+
     def enviar_audio(self, sessao_id: int, audio_b64: str, mime_type: str = "audio/wav"):
-        """Recebe uma gravação curta, interpreta o pedido falado e responde em texto."""
+        """Recebe uma gravação curta, transcreve, executa ações do agente e responde em texto."""
         try:
             api_key = carregar_key()
             if not api_key:
@@ -407,70 +426,108 @@ class API:
             if tamanho > 15 * 1024 * 1024:
                 return self._erro("A gravação passou de 15 MB. Grave uma mensagem mais curta.")
 
+            transcricao = self._transcrever_audio(api_key, audio_b64, mime_type)
+            if not transcricao or len(transcricao) < 2:
+                return self._erro("Não consegui entender o áudio. Fale mais perto do microfone e tente de novo.")
+
             historico = carregar_historico(sessao_id)
-            conteudo = [
-                {"type": "audio_data", "mime_type": mime_type, "data": audio_b64},
-                {"type": "text", "text": "Interprete o pedido falado neste áudio e responda diretamente em português brasileiro, como em uma conversa por voz."},
-            ]
-            historico.append({"role": "user", "content": conteudo})
-            salvar_mensagem(sessao_id, "user", "[Mensagem de voz]")
+            historico.append({"role": "user", "content": transcricao})
+            salvar_mensagem(sessao_id, "user", f"🎙 {transcricao}")
+
+            try:
+                ctx_agente = self._tentar_acao_agente(sessao_id, transcricao)
+                if ctx_agente:
+                    historico.append({"role": "system", "content": ctx_agente})
+            except Exception:
+                pass
+
+            try:
+                ctx_web = self._tentar_web_search(transcricao)
+                if ctx_web:
+                    historico.append({"role": "system", "content": ctx_web})
+            except Exception:
+                pass
+
             resposta = chamar_gemini(api_key, historico)
             salvar_mensagem(sessao_id, "assistant", resposta)
-            self._tentar_renomear_sessao(sessao_id, "Mensagem de voz")
-            return self._ok({"tipo": "texto", "resposta": resposta})
+            self._tentar_renomear_sessao(sessao_id, transcricao)
+            return self._ok({"tipo": "texto", "resposta": resposta, "transcricao": transcricao})
         except Exception as e:
             return self._erro(f"Falha na conversa por voz: {e}")
+
+    def _iniciar_gravacao_sounddevice(self):
+        import sounddevice as sd
+        frames = []
+
+        def callback(indata, frame_count, time_info, status):
+            if status:
+                print(f"[NOVA] Microfone: {status}")
+            frames.append(bytes(indata))
+
+        stream = sd.RawInputStream(
+            samplerate=16000, channels=1, dtype="int16",
+            blocksize=2048, callback=callback,
+        )
+        stream.start()
+        self._gravacao = {
+            "tipo": "sounddevice", "stream": stream,
+            "frames": frames, "inicio": time.time(),
+        }
+        return self._ok({"backend": "sounddevice"})
+
+    def _iniciar_gravacao_arecord(self):
+        if not (sys.platform.startswith("linux") and shutil.which("arecord")):
+            raise RuntimeError("arecord não está disponível neste sistema.")
+        arquivo = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        caminho = arquivo.name
+        arquivo.close()
+        processo = subprocess.Popen(
+            ["arecord", "-q", "-f", "S16_LE", "-r", "16000", "-c", "1", "-t", "wav", caminho],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        time.sleep(0.15)
+        if processo.poll() is not None:
+            erro = processo.stderr.read().decode("utf-8", errors="replace").strip()
+            try:
+                os.unlink(caminho)
+            except OSError:
+                pass
+            raise RuntimeError(erro or "Nenhum microfone foi encontrado pelo sistema.")
+        self._gravacao = {
+            "tipo": "arecord", "processo": processo,
+            "caminho": caminho, "inicio": time.time(),
+        }
+        return self._ok({"backend": "arecord"})
+
+    def _parar_processo_arecord(self, processo):
+        if sys.platform == "win32":
+            processo.terminate()
+        else:
+            processo.send_signal(signal.SIGINT)
+        try:
+            processo.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            processo.kill()
+            processo.wait()
 
     def iniciar_gravacao_nativa(self):
         """Inicia captura pelo sistema, sem depender das permissões do WebView."""
         with self._gravacao_lock:
             if self._gravacao:
                 return self._erro("Já existe uma gravação em andamento.")
-            try:
+            erros = []
+            for iniciar in (self._iniciar_gravacao_sounddevice, self._iniciar_gravacao_arecord):
                 try:
-                    import sounddevice as sd
-                    frames = []
-
-                    def callback(indata, frame_count, time_info, status):
-                        if status:
-                            print(f"[NOVA] Microfone: {status}")
-                        frames.append(bytes(indata))
-
-                    stream = sd.RawInputStream(
-                        samplerate=16000, channels=1, dtype="int16",
-                        blocksize=2048, callback=callback,
-                    )
-                    stream.start()
-                    self._gravacao = {"tipo": "sounddevice", "stream": stream,
-                                      "frames": frames, "inicio": time.time()}
-                    return self._ok({"backend": "sounddevice"})
+                    return iniciar()
                 except ImportError:
-                    if sys.platform.startswith("linux") and shutil.which("arecord"):
-                        arquivo = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-                        caminho = arquivo.name
-                        arquivo.close()
-                        processo = subprocess.Popen(
-                            ["arecord", "-q", "-f", "S16_LE", "-r", "16000",
-                             "-c", "1", "-t", "wav", caminho],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                        )
-                        time.sleep(0.15)
-                        if processo.poll() is not None:
-                            erro = processo.stderr.read().decode("utf-8", errors="replace").strip()
-                            try:
-                                os.unlink(caminho)
-                            except OSError:
-                                pass
-                            raise RuntimeError(erro or "Nenhum microfone foi encontrado pelo sistema.")
-                        self._gravacao = {"tipo": "arecord", "processo": processo,
-                                          "caminho": caminho, "inicio": time.time()}
-                        return self._ok({"backend": "arecord"})
-                    raise RuntimeError(
-                        "Instale o suporte nativo com: pip install sounddevice"
-                    )
-            except Exception as e:
-                self._gravacao = None
-                return self._erro(f"Não foi possível abrir o microfone: {e}")
+                    erros.append("sounddevice não instalado")
+                except Exception as e:
+                    erros.append(str(e))
+                    self._gravacao = None
+            dica = "Instale com: pip install sounddevice"
+            if sys.platform.startswith("linux"):
+                dica += " (ou verifique se o microfone está conectado e o arecord funciona)"
+            return self._erro(f"Não foi possível abrir o microfone. {' | '.join(erros)}. {dica}")
 
     def parar_gravacao_nativa(self, sessao_id: int):
         with self._gravacao_lock:
@@ -490,13 +547,9 @@ class API:
                     wav.writeframes(b"".join(gravacao["frames"]))
             else:
                 processo = gravacao["processo"]
-                processo.terminate()
-                try:
-                    processo.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    processo.kill(); processo.wait()
+                self._parar_processo_arecord(processo)
                 caminho = gravacao["caminho"]
-                if processo.returncode not in (0, -15):
+                if processo.returncode not in (0, -2, -15) and not os.path.exists(caminho):
                     erro = processo.stderr.read().decode("utf-8", errors="replace").strip()
                     raise RuntimeError(erro or "O gravador do sistema falhou.")
             if duracao < 0.5 or not os.path.exists(caminho) or os.path.getsize(caminho) < 100:
