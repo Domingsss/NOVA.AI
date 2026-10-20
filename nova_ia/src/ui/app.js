@@ -230,8 +230,8 @@ window.addEventListener("pywebviewready", async () => {
   document.getElementById("input-cidade").value = cidadeDashboard
   try { await carregarDashboard() } catch (e) { console.error(e); mostrarErroDashboard(String(e)) }
   iniciarMonitorSistema()
-  try { await abrirUltimaConversa() } catch (e) { console.error(e) }
-  try { await carregarResumoMatinal() } catch (e) { console.error(e) }
+  try { await carregarSessoes() } catch (e) { console.error(e) }
+  // A tela inicial fica livre; os resumos estão disponíveis no sistema orbital.
   try { await atualizarStatsFoco() } catch (e) { console.error(e) }
   try { await atualizarBadges() } catch (e) { console.error(e) }
   try { await atualizarKeyDot() } catch (e) { console.error(e) }
@@ -383,7 +383,7 @@ function showProgressBar() { document.getElementById("chat-progress-bar").classL
 function hideProgressBar() { document.getElementById("chat-progress-bar").classList.remove("active") }
 async function enviarMensagem() {
   const input = document.getElementById("chat-input"); const texto = input.value.trim(); const img = imagemChatB64
-  if (!texto && !img) return; if (!sessaoAtual) return
+  if (!texto && !img) return; if (!sessaoAtual) await novaConversa(); if (!sessaoAtual) return
   input.value = ""; input.style.height = "auto"
   if (img) { const m = document.getElementById("chat-msgs"); const d = document.createElement("div"); d.className = "msg user"; d.innerHTML = `<div class="msg-content"><div class="bubble" style="padding:6px"><img src="${img}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"/>${texto ? `<span style="display:block;margin-top:6px">${escapeHTML(texto)}</span>` : ""}</div><div class="msg-meta">${agoraHora()}</div></div>`; m.appendChild(d); m.scrollTop = m.scrollHeight } else adicionarMensagem("user", texto)
   removerImagem(); const btn = document.getElementById("chat-send"); btn.disabled = true; showProgressBar()
@@ -398,9 +398,33 @@ window.__novaChunk = function(texto) { if (!document.getElementById("streaming-b
 window.__novaFim = function() { const b = document.getElementById("streaming-bubble"); if (!b) return; const c = b.querySelector(".streaming-cursor"); if (c) c.remove(); const texto = b.textContent; b.innerHTML = renderMarkdown(texto); decorarBlocosCodigo(b); b.removeAttribute("id") }
 window.__novaErro = function(msg) { if (!document.getElementById("streaming-bubble")) window.__novaPrimeiroChunk(); const b = document.getElementById("streaming-bubble"); if (!b) return; b.removeAttribute("id"); b.textContent = `❌ ${msg}`; showToast("Erro", msg, "error") }
 window.__novaAgenteAcao = function(tipo, desc) { const ic = { tarefa: "✅", lembrete: "⏰", listar: "📋" }; showToast(`${ic[tipo] || "✨"} Ação executada`, desc, "success", 3000); atualizarBadges() }
-function abrirModalConfig() { document.getElementById("modal-config").style.display = "flex"; atualizarKeyDot() }
+function abrirModalConfig() {
+  document.getElementById("modal-config").style.display = "flex";
+  document.getElementById("input-key").value = "";
+  resetIntegration();
+  loadIntegrations();
+  loadLocalChat();
+  atualizarKeyDot();
+}
 function toggleSetting(key, el) { el.classList.toggle("on"); settings[key] = el.classList.contains("on"); if (key === "particles") criarParticulas() }
-async function salvarConfig() { const k = document.getElementById("input-key").value.trim(); cidadeDashboard = document.getElementById("input-cidade").value.trim() || "Rio de Janeiro"; storageSet("novaCidade", cidadeDashboard); if (k) { await chamarAPI("salvar_api_key", k); showToast("API Key salva!", "", "success", 2000) } fecharModal("modal-config"); await atualizarKeyDot(); carregarDashboard(true) }
+async function salvarConfig() {
+  try {
+    const localResult = await chamarAPI('configurar_chat_local', document.getElementById('local-chat-enabled').checked, document.getElementById('local-chat-model').value.trim());
+    if (!localResult.ok) throw new Error(localResult.erro);
+    const key = document.getElementById("input-key").value.trim();
+    if (key) {
+      const response = await chamarAPI("salvar_api_key", key);
+      if (!response.ok) throw new Error(response.erro);
+      document.getElementById("input-key").value = "";
+    }
+    cidadeDashboard = document.getElementById("input-cidade").value.trim() || "Rio de Janeiro";
+    storageSet("novaCidade", cidadeDashboard);
+    fecharModal("modal-config");
+    await atualizarKeyDot();
+    carregarDashboard(true);
+    showToast("Configurações salvas", "", "success", 2000);
+  } catch (error) { showToast("Erro ao salvar", error.message, "error"); }
+}
 function mostrarSkeleton(lista, n = 3) { lista.innerHTML = ""; for (let i = 0; i < n; i++) { const s = document.createElement("div"); s.className = "skeleton-card"; s.innerHTML = `<div style="flex:1"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>`; lista.appendChild(s) } }
 async function carregarTarefas() {
   const l = document.getElementById("lista-tarefas"); mostrarSkeleton(l); const r = await chamarAPI("get_tarefas"); if (!r.ok) { l.innerHTML = ""; return }
@@ -470,20 +494,3 @@ async function aplicarEdicaoTexto() {
 }
 function fecharModal(id) { document.getElementById(id).style.display = "none" }
 document.addEventListener("click", e => { if (e.target.classList.contains("modal")) e.target.style.display = "none" })
-
-  import { GoogleGenAI } from '@google/genai';
-
-const client = new GoogleGenAI({});
-
-let interaction = await client.interactions.create({
-    model: 'gemini-3.6-flash',
-    input: 'Hi, my name is Phil.'
-});
-console.log("Response 1:", interaction.output_text);
-
-interaction = await client.interactions.create({
-    model: 'gemini-3.6-flash',
-    previous_interaction_id: interaction.id,
-    input: 'What is my name?'
-});
-console.log("Response 2:", interaction.output_text);

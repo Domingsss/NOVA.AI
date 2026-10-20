@@ -28,6 +28,8 @@ from database import (
     stats_foco_hoje, salvar_sessao_foco, resumo_matinal
 )
 from rotinas import gerar_resumo_matinal
+from integrations import list_integrations, save_integration, delete_integration
+import local_chat
 
 
 class API:
@@ -197,6 +199,14 @@ class API:
             print(f"[NOVA] Dashboard com falhas: {dados['erros']}")
         return self._ok(dados)
 
+    def consultar_agente(self, agente_id: str, pergunta: str, cidade: str = "Rio de Janeiro"):
+        """Consulta um especialista com dados atuais apenas de sua área."""
+        try:
+            from solar_agents import consultar
+            return self._ok(consultar(self, agente_id, pergunta, cidade))
+        except Exception as erro:
+            return self._erro(erro)
+
     def get_info_computador(self):
         """Leitura local e leve para o monitor ao vivo do System Fetch."""
         try:
@@ -205,6 +215,47 @@ class API:
             return self._erro(erro)
 
     # ── API Key ───────────────────────────────────────────────────────────────
+
+    def get_chat_local(self):
+        try:
+            return self._ok(local_chat.settings())
+        except Exception as erro:
+            return self._erro(erro)
+
+    def configurar_chat_local(self, enabled, model):
+        try:
+            local_chat.configure(enabled, model)
+            return self._ok()
+        except Exception as erro:
+            return self._erro(erro)
+
+    def listar_modelos_locais(self):
+        try:
+            return self._ok(local_chat.models())
+        except Exception as erro:
+            return self._erro(erro)
+
+    def listar_integracoes(self):
+        try:
+            return self._ok(list_integrations())
+        except Exception:
+            return self._erro("Não foi possível ler o cadastro de APIs.")
+
+    def salvar_integracao(self, data):
+        try:
+            save_integration(data)
+            return self._ok()
+        except ValueError as erro:
+            return self._erro(erro)
+        except Exception:
+            return self._erro("Não foi possível salvar a API.")
+
+    def excluir_integracao(self, identifier):
+        try:
+            delete_integration(identifier)
+            return self._ok()
+        except Exception:
+            return self._erro("Não foi possível excluir a API.")
 
     def get_api_key(self):
         try:
@@ -258,7 +309,7 @@ class API:
     def enviar_mensagem(self, sessao_id: int, mensagem: str, imagem_b64: str = None):
         try:
             api_key = carregar_key()
-            if not api_key:
+            if not api_key and not local_chat.settings()['enabled']:
                 return self._erro("API key não configurada.")
 
             historico = carregar_historico(sessao_id)
@@ -346,7 +397,7 @@ class API:
                         pass
 
             api_key = carregar_key()
-            if not api_key:
+            if not api_key and not local_chat.settings()['enabled']:
                 emit("window.__novaErro && window.__novaErro('API key não configurada.')")
                 return self._erro("API key não configurada.")
 

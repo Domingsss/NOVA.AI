@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
+from pathlib import Path
+
+project = Path(SPECPATH)
+
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    [str(project / 'src' / 'main.py')],
+    pathex=[str(project / 'src')],
     binaries=[],
-    datas=[],
+    datas=[(str(project / 'src' / 'ui'), 'ui')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

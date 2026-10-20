@@ -799,6 +799,35 @@ body:not([data-theme="dark"]) .dash-weather .weather-stats span {
 body:not([data-theme="dark"]) #conteudo > #chat-particles { opacity: .32; }
 @media (prefers-reduced-motion: reduce) { #conteudo > #chat-particles .particle { animation-duration: 40s; } }
 
+/* NOVA — presença central e disco de acreção procedural. */
+#nova-presence { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 3px 20px; position: relative; z-index: 2; }
+.nova-orb { width: 70px; height: 70px; flex-shrink: 0; }
+#nova-orb-canvas { display: block; width: 100%; height: 100%; }
+.nova-presence-copy { display: none; }
+#nova-presence-status { font-size: 11px; color: var(--muted); letter-spacing: .2px; }
+#aba-chat.conversation-empty { justify-content: center; overflow-y: auto; }
+#aba-chat.conversation-empty #chat-header { display: none; }
+#aba-chat.conversation-empty #chat-msgs { display: none; }
+#aba-chat.conversation-empty #nova-presence { flex-direction: column; gap: 0; padding: 0; margin-top: auto; }
+#aba-chat.conversation-empty .nova-orb { width: clamp(220px, 36vh, 360px); height: clamp(220px, 36vh, 360px); }
+#aba-chat.conversation-empty .nova-presence-copy { display: block; text-align: center; margin-top: -10px; }
+.nova-presence-name { color: var(--muted); font-size: 10px; letter-spacing: 6px; padding-left: 6px; }
+.nova-presence-copy h2 { font-weight: 400; font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -.9px; color: var(--text); margin: 14px 0 9px; }
+#aba-chat.conversation-empty #nova-presence-status { margin: 0 0 30px; font-size: 12px; }
+#aba-chat.conversation-empty #chat-input-area { width: min(680px, 100%); max-width: 100%; margin: 0 auto auto; background: none; padding: 0 24px 24px; }
+#aba-chat.conversation-empty #chat-input-wrap { border-radius: 28px; }
+#nova-presence[data-state="listening"] #nova-presence-status { color: #39a9b9; }
+#nova-presence[data-state="thinking"] #nova-presence-status { color: #a17be9; }
+#nova-presence[data-state="speaking"] #nova-presence-status { color: #aa82dc; }
+@media (max-height: 620px) {
+  #aba-chat.conversation-empty .nova-orb { width: 190px; height: 190px; }
+  #aba-chat.conversation-empty #nova-presence-status { margin-bottom: 18px; }
+}
+@media (max-width: 560px) {
+  #aba-chat.conversation-empty #chat-input-area { padding-inline: 14px; }
+  .nova-presence-copy h2 { font-size: 23px; }
+}
+
 /* Compositor da conversa */
 #chat-input-area { padding: 14px 20px 18px; background: linear-gradient(180deg,transparent 0%,rgba(9,8,18,.9) 32%,#090812 72%); }
 #chat-input-wrap {
@@ -827,3 +856,10 @@ body:not([data-theme="dark"]) #chat-input-area { background: linear-gradient(180
 body:not([data-theme="dark"]) #chat-input-wrap { background: rgba(255,255,255,.96); border-color: #ddd5e8; box-shadow: 0 12px 35px rgba(65,42,96,.11),inset 0 1px 0 #fff; }
 body:not([data-theme="dark"]) #chat-input-wrap:focus-within { border-color: #9b75ee; box-shadow: 0 14px 38px rgba(65,42,96,.14),0 0 0 4px rgba(124,58,237,.08); }
 body:not([data-theme="dark"]) #btn-anexar:hover,body:not([data-theme="dark"]) #chat-mic:hover { background: #eee8f8; color: #7048d7; }
+
+/* Cadastro de serviços nas configurações. */
+.integration-row { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+.integration-row span { flex: 1; min-width: 140px; overflow-wrap: anywhere; }
+#modal-config label { display: block; margin-top: 10px; font-size: 13px; }
+#integration-category { width: 100%; padding: 9px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+#modal-config .modal-box { max-width: calc(100vw - 32px); }

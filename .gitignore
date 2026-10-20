@@ -1,3 +1,20 @@
 # Credenciais locais da API do Gemini
 nova_ia/**/GEMINI_API_KEY.json
 nova_ia/.venv/
+
+# Dados locais, credenciais e arquivos gerados
+**/__pycache__/
+*.py[cod]
+**/build/
+**/dist/
+node_modules/
+nova_ia/data/
+*.db
+*.db-wal
+*.db-shm
+**/.nova_key
+**/APICHV.json
+**/theme.json
+**/models/
+**/imagens_editadas/
+legacy/backups/

@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 
 from config import API_KEY_FILE, AUDIO_MODELS, FALLBACK_MODEL, GEMINI_API_URL, MODEL, SYSTEM_PROMPT
+import local_chat
 
 
 def salvar_key(key: str):
@@ -187,6 +188,8 @@ def chamar_gemini_multimodal(api_key: str, historico: list, max_tokens: int = 51
 
 def chamar_gemini(api_key: str, historico: list) -> str:
     """Chama o Gemini com o histórico completo da conversa."""
+    if local_chat.settings()['enabled']:
+        return ''.join(local_chat.chat_stream(historico))
     try:
         with _requisicao_resiliente(api_key, "generateContent", _payload(historico, SYSTEM_PROMPT, 1024)) as resposta:
             return _texto_resposta(json.load(resposta))
@@ -198,6 +201,9 @@ def chamar_gemini(api_key: str, historico: list) -> str:
 
 def chamar_gemini_stream(api_key: str, historico: list):
     """Gera a resposta do Gemini em streaming, um trecho de texto por vez."""
+    if local_chat.settings()['enabled']:
+        yield from local_chat.chat_stream(historico)
+        return
     try:
         with _requisicao_resiliente(
             api_key,
@@ -224,6 +230,8 @@ def chamar_gemini_stream(api_key: str, historico: list):
 
 def chamar_gemini_simples(system_prompt: str, mensagem: str) -> str:
     """Faz uma chamada curta usada por classificadores e interpretadores."""
+    if local_chat.settings()['enabled']:
+        return ''.join(local_chat.chat_stream([{'role': 'user', 'content': mensagem}], system_prompt))
     api_key = carregar_key()
     historico = [{"role": "user", "content": mensagem}]
     try:

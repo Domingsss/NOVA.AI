@@ -1,0 +1,9 @@
+pywebview
+Pillow
+numpy
+httpx
+certifi
+psutil
+ddgs
+plyer
+-r requirements-voice.txt

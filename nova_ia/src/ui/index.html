@@ -7,10 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=20260809-live-monitor-7"/>
+<link rel="stylesheet" href="style.css?v=20261017-solar"/>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="solar.css?v=1"/>
 </head>
-<body>
+<body class="sidebar-collapsed">
 
 <div id="splash">
   <div class="splash-logo">NOVA</div>
@@ -51,7 +52,7 @@
 
   <div class="sidebar-section-label rotinas-label">ROTINAS</div>
   <nav id="nav">
-    <button class="nav-btn active" data-aba="dashboard">
+    <button class="nav-btn active" data-aba="chat">
       <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <span class="nav-label">Início</span>
     </button>
@@ -99,7 +100,7 @@
     </button>
     <div class="topbar-actions"><button title="Notificações">♧</button><button id="topbar-voice" onclick="toggleVozNova()" title="Ativar/desativar voz da NOVA">◖</button><button id="topbar-mic" onclick="toggleGravacao()" title="Conversar por voz">♩</button></div>
   </header>
-  <section id="aba-dashboard" class="aba active">
+  <section id="aba-dashboard" class="aba">
     <div class="dashboard-header">
       <div>
         <div class="dashboard-kicker">CENTRAL DA NOVA</div>
@@ -144,7 +145,7 @@
     <div class="dashboard-footer"><span id="dashboard-atualizado">—</span><span class="online-pill">● SISTEMAS ONLINE</span></div>
   </section>
 
-  <section id="aba-chat" class="aba">
+  <section id="aba-chat" class="aba active">
     <div id="chat-progress-bar"></div>
     <div id="chat-header">
       <div class="chat-header-avatar">N</div>
@@ -162,6 +163,11 @@
           <svg class="theme-ico" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </div>
       </div>
+    </div>
+    <div id="nova-presence" data-state="idle">
+      <button class="nova-orb" id="nova-universe-toggle" type="button" aria-label="Explorar o sistema NOVA" aria-expanded="false" aria-controls="aba-solar" title="Explorar o sistema NOVA"><canvas id="nova-orb-canvas" aria-hidden="true"></canvas></button>
+      <div class="nova-presence-copy"><span class="nova-presence-name">N O V A</span><h2>Por onde começamos?</h2><p class="nova-universe-hint">Clique no buraco negro para explorar seu sistema solar.</p></div>
+      <p id="nova-presence-status" role="status">Estou aqui. Pode falar.</p>
     </div>
     <div id="chat-msgs"></div>
     <button id="scroll-bottom-btn" onclick="scrollChatBottom()" title="Ir para o final">
@@ -306,9 +312,37 @@
   <div class="modal-box modal-lg">
     <h3>Configurações</h3>
     <div class="modal-section">
-      <div class="modal-section-label">API Key</div>
+      <div class="modal-section-label">Chat no computador · Ollama</div>
+      <label><input type="checkbox" id="local-chat-enabled"/> Usar Ollama local nas respostas</label>
+      <label for="local-chat-model">Modelo instalado</label>
+      <input type="text" id="local-chat-model" list="local-chat-models" placeholder="Em branco usa o primeiro modelo instalado"/>
+      <datalist id="local-chat-models"></datalist>
+      <button class="btn-secondary" onclick="refreshLocalModels()">Buscar modelos no computador</button>
+      <p class="modal-row-desc" id="local-chat-status">Ollama deve estar aberto. Não precisa de chave. Salve no rodapé para aplicar.</p>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Gemini · usado quando o chat local está desligado</div>
       <input type="password" id="input-key" placeholder="Cole sua Gemini API key..."/>
       <div class="modal-row"><div><div class="modal-row-label">API Key configurada</div><div class="modal-row-desc" id="key-status">Verificando...</div></div><div class="key-dot" id="key-dot-modal"></div></div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">APIs adicionais</div>
+      <p class="modal-row-desc">Cadastre serviços de respostas, imagens e vídeos para usar depois. O cadastro não ativa o serviço: cada provedor ainda precisa ser integrado à NOVA.</p>
+      <div id="integration-list" aria-live="polite"></div>
+      <input type="hidden" id="integration-id"/>
+      <label for="integration-category">Finalidade</label>
+      <select id="integration-category"><option value="respostas">Respostas</option><option value="imagens">Imagens</option><option value="videos">Vídeos</option></select>
+      <label for="integration-name">Nome do serviço</label>
+      <input type="text" id="integration-name" maxlength="120" placeholder="Nome para identificar a API"/>
+      <label for="integration-url">Endereço da API (opcional)</label>
+      <input type="text" id="integration-url" placeholder="https://..."/>
+      <label for="integration-model">Modelo (opcional)</label>
+      <input type="text" id="integration-model" placeholder="Identificador do modelo"/>
+      <label for="integration-key">Chave da API</label>
+      <input type="password" id="integration-key" autocomplete="new-password" placeholder="Em branco mantém a chave salva"/>
+      <label><input type="checkbox" id="integration-clear-key"/> Remover a chave salva</label>
+      <p class="modal-row-desc">As chaves ficam em um arquivo local neste computador. Não compartilhe a pasta de dados.</p>
+      <div class="modal-btns"><button class="btn-secondary" onclick="resetIntegration()">Novo cadastro</button><button class="btn-primary" id="integration-save" onclick="saveIntegration()">Salvar API</button></div>
     </div>
     <div class="modal-section">
       <div class="modal-section-label">Dashboard</div>
@@ -340,6 +374,9 @@
   <div class="modal-box"><h3>Novo Hábito</h3><input type="text" id="habito-nome" placeholder="Nome do hábito"/><div class="ctrl-linha"><input type="text" id="habito-icone" placeholder="Ícone" value="⭐" style="width:60px"/><input type="color" id="habito-cor" value="#7c6fff"/></div><div class="modal-btns"><button class="btn-secondary" onclick="fecharModal('modal-habito')">Cancelar</button><button class="btn-primary" onclick="criarHabito()">Criar</button></div></div>
 </div>
 
-<script src="app.js?v=20260809-live-monitor-7"></script>
+<script src="app.js?v=20261017-solar"></script>
+<script src="integrations.js?v=1"></script>
+<script src="nova-presence.js?v=2"></script>
+<script src="solar.js?v=1"></script>
 </body>
 </html>

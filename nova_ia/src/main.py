@@ -1,5 +1,6 @@
 # src/main.py
 import os
+import hashlib
 import shutil
 import sys
 import traceback
@@ -40,10 +41,15 @@ def main():
     print(f"[NOVA] HTML: {caminho_html}")
     print(f"[NOVA] Arquivo existe: {os.path.exists(caminho_html)}")
 
+    # WebView2 keeps the same local origin between launches. Version the entry
+    # page so an older cached index cannot hide a newly installed interface.
+    with open(caminho_html, 'rb') as pagina:
+        versao_ui = hashlib.sha256(pagina.read()).hexdigest()[:16]
+
     # Cria a janela do pywebview
     webview.create_window(
         title="NOVA — Assistente Pessoal",
-        url=caminho_html,
+        url=f"{caminho_html}?v={versao_ui}",
         js_api=api,       # Liga o JS no Python
         width=1100,
         height=700,
