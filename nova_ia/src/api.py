@@ -38,7 +38,7 @@ class API:
         self._gravacao_lock = threading.Lock()
         self._gravacao = None
 
-    # ── Utilitários ───────────────────────────────────────────────────────────
+    # utilitários
 
     def _ok(self, data=None):
         return json.dumps({"ok": True, "data": data})
@@ -46,7 +46,7 @@ class API:
     def _erro(self, msg):
         return json.dumps({"ok": False, "erro": str(msg)})
 
-    # ── Dashboard ─────────────────────────────────────────────────────────────
+    # dashboard
 
     @staticmethod
     def _get_json(url: str):
@@ -66,7 +66,7 @@ class API:
 
         req = urllib.request.Request(url, headers=headers)
         contexto = ssl.create_default_context()
-        # PyInstaller nem sempre encontra os certificados do sistema no Windows.
+        # pyInstaller nem sempre encontra os certificados do sistema no Windows.
         try:
             import certifi
             contexto = ssl.create_default_context(cafile=certifi.where())
@@ -214,7 +214,7 @@ class API:
         except Exception as erro:
             return self._erro(erro)
 
-    # ── API Key ───────────────────────────────────────────────────────────────
+    # aPI Key
 
     def get_chat_local(self):
         try:
@@ -271,7 +271,7 @@ class API:
         except Exception as e:
             return self._erro(e)
 
-    # ── Chat ──────────────────────────────────────────────────────────────────
+    # chat
 
     def nova_sessao(self, titulo: str = "Nova conversa"):
         try:
@@ -340,7 +340,7 @@ class API:
             historico.append({"role": "user", "content": conteudo})
             salvar_mensagem(sessao_id, "user", mensagem or "[imagem]")
 
-            # NOVA agente: tenta executar uma ação (criar tarefa/lembrete, etc)
+            # nOVA agente: tenta executar uma ação (criar tarefa/lembrete, etc)
             # antes de responder. Se executou, adiciona contexto pro modelo.
             try:
                 ctx_agente = self._tentar_acao_agente(sessao_id, mensagem or "")
@@ -349,7 +349,7 @@ class API:
             except Exception:
                 pass  # best-effort: não deixa o agente quebrar o chat
 
-            # Web search: se a pergunta precisa de informação atual, busca
+            # web search: se a pergunta precisa de informação atual, busca
             # no DuckDuckGo e adiciona os resultados como contexto.
             try:
                 ctx_web = self._tentar_web_search(mensagem or "")
@@ -361,7 +361,7 @@ class API:
             try:
                 resposta = chamar_gemini(api_key, historico)
             except Exception as e:
-                # Erro da API: NÃO salva uma "resposta" de erro no banco,
+                # erro da API: não salva uma "resposta" de erro no banco,
                 # pois poluiria o histórico e confundiria a IA nas próximas
                 # mensagens. A mensagem do usuário já foi salva e é válida
                 # como contexto.
@@ -369,7 +369,7 @@ class API:
 
             salvar_mensagem(sessao_id, "assistant", resposta)
 
-            # Renomeia a sessão se ainda tiver o título padrão (só na 1ª troca)
+            # renomeia a sessão se ainda tiver o título padrão (só na 1ª troca)
             self._tentar_renomear_sessao(sessao_id, mensagem or "Imagem enviada")
 
             return self._ok({"tipo": "texto", "resposta": resposta})
@@ -405,9 +405,9 @@ class API:
             historico.append({"role": "user", "content": mensagem})
             salvar_mensagem(sessao_id, "user", mensagem)
 
-            # NOVA agente: tenta executar uma ação (criar tarefa/lembrete, etc)
+            # nOVA agente: tenta executar uma ação (criar tarefa/lembrete, etc)
             # antes de responder. Se executou, adiciona contexto pro modelo.
-            # IMPORTANTE: a ação roda ANTES do streaming começar, pra que a
+            # iMPORTANTE: a ação roda antes do streaming começar, pra que a
             # confirmação já venha no stream.
             try:
                 ctx_agente = self._tentar_acao_agente(sessao_id, mensagem)
@@ -416,7 +416,7 @@ class API:
             except Exception:
                 pass  # best-effort: não deixa o agente quebrar o chat
 
-            # Web search: se a pergunta precisa de informação atual, busca
+            # web search: se a pergunta precisa de informação atual, busca
             # no DuckDuckGo e adiciona os resultados como contexto.
             try:
                 ctx_web = self._tentar_web_search(mensagem)
@@ -432,7 +432,7 @@ class API:
                     emit(f"window.__novaChunk && window.__novaChunk({json.dumps(chunk)});")
             except Exception as e:
                 emit(f"window.__novaErro && window.__novaErro({json.dumps(str(e))});")
-                # Não salva resposta parcial no banco — poluiria o histórico
+                # não salva resposta parcial no banco, poluiria o histórico
                 return self._erro(f"Falha ao contatar a IA: {e}")
 
             salvar_mensagem(sessao_id, "assistant", resposta_completa)
@@ -483,7 +483,7 @@ class API:
 
             historico = carregar_historico(sessao_id)
             historico.append({"role": "user", "content": transcricao})
-            salvar_mensagem(sessao_id, "user", f"🎙 {transcricao}")
+            salvar_mensagem(sessao_id, "user", f" {transcricao}")
 
             try:
                 ctx_agente = self._tentar_acao_agente(sessao_id, transcricao)
@@ -671,7 +671,7 @@ Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
             if acao == "nenhuma" or not acao:
                 return None
 
-            # ── Executa a ação ──
+            # executa a ação
             if acao == "criar_tarefa":
                 titulo = params.get("titulo", "").strip()
                 if not titulo:
@@ -684,7 +684,7 @@ Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
                     prazo = None
                 tid = criar_tarefa(titulo, "", None, prioridade, prazo)
                 prazo_txt = f" (prazo: {prazo})" if prazo else ""
-                return f"[SISTEMA — Ação executada automaticamente: criei a tarefa #{tid} '{titulo}' com prioridade {prioridade}{prazo_txt}. Confirme ao usuário de forma natural, mencionando a tarefa.]"
+                return f"[SISTEMA, Ação executada automaticamente: criei a tarefa #{tid} '{titulo}' com prioridade {prioridade}{prazo_txt}. Confirme ao usuário de forma natural, mencionando a tarefa.]"
 
             if acao == "criar_lembrete":
                 titulo = params.get("titulo", "").strip()
@@ -696,14 +696,14 @@ Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
                     repetir = "nunca"
                 lid = criar_lembrete(titulo, data_hora, "", repetir)
                 rep_txt = f", repete {repetir}" if repetir != "nunca" else ""
-                return f"[SISTEMA — Ação executada automaticamente: criei o lembrete #{lid} '{titulo}' para {data_hora}{rep_txt}. Confirme ao usuário de forma natural, mencionando o lembrete.]"
+                return f"[SISTEMA, Ação executada automaticamente: criei o lembrete #{lid} '{titulo}' para {data_hora}{rep_txt}. Confirme ao usuário de forma natural, mencionando o lembrete.]"
 
             if acao == "listar_tarefas":
                 tarefas = listar_tarefas(status="pendente")
                 if not tarefas:
-                    return "[SISTEMA — Ação executada: o usuário pediu suas tarefas pendentes. Não há nenhuma. Avise.]"
+                    return "[SISTEMA, Ação executada: o usuário pediu suas tarefas pendentes. Não há nenhuma. Avise.]"
                 lista = "; ".join(f"{t['titulo']} ({t['prioridade']})" for t in tarefas[:10])
-                return f"[SISTEMA — Ação executada: o usuário pediu suas tarefas pendentes. Encontrei {len(tarefas)}: {lista}. Apresente ao usuário de forma organizada.]"
+                return f"[SISTEMA, Ação executada: o usuário pediu suas tarefas pendentes. Encontrei {len(tarefas)}: {lista}. Apresente ao usuário de forma organizada.]"
 
             return None
 
@@ -720,7 +720,7 @@ Responda APENAS com um JSON válido, sem markdown, sem texto antes ou depois:
         Requer o pacote 'duckduckgo-search' (ou 'ddgs') instalado.
         """
         try:
-            # ── 1. Classifica + extrai query de busca (1 chamada LLM) ──
+            # 1. Classifica + extrai query de busca (1 chamada LLM)
             system = """Analise a mensagem do usuário. Decida se ela precisa de informação ATUAL ou RECENTE que provavelmente NÃO está no seu conhecimento pré-treinado.
 
 Precisa de busca web se a mensagem pergunta sobre:
@@ -735,7 +735,7 @@ NÃO precisa de busca se for:
 - Pergunta conceitual ("o que é X", "como funciona Y")
 - Pedido de opinião, criatividade, escrita
 - Conversa genérica, cumprimentos
-- Pedido de ação (criar tarefa/lembrete) — outro sistema cuida disso
+- Pedido de ação (criar tarefa/lembrete), outro sistema cuida disso
 - Conhecimento histórico, ciência, matemática
 
 Responda APENAS com um JSON válido, sem markdown:
@@ -759,8 +759,8 @@ ou
             if not query:
                 return None
 
-            # ── 2. Faz a busca no DuckDuckGo ──
-            # Prioriza o pacote novo 'ddgs' (o antigo 'duckduckgo_search' v8
+            # 2. Faz a busca no DuckDuckGo
+            # prioriza o pacote novo 'ddgs' (o antigo 'duckduckgo_search' v8
             # está deprecated e retorna 0 resultados).
             DDGS = None
             try:
@@ -769,15 +769,15 @@ ou
                 try:
                     from duckduckgo_search import DDGS
                 except ImportError:
-                    return None  # busca não disponível — ignora silenciosamente
+                    return None  # busca não disponível, ignora silenciosamente
 
-            # API nova (ddgs / duckduckgo_search v6+): sem context manager
+            # aPI nova (ddgs / duckduckgo_search v6+): sem context manager
             raw = None
             try:
                 ddgs = DDGS()
                 raw = list(ddgs.text(query, max_results=4))
             except Exception:
-                # Fallback: context manager (v5 e anteriores)
+                # fallback: context manager (v5 e anteriores)
                 try:
                     with DDGS() as ddgs:
                         raw = list(ddgs.text(query, max_results=4))
@@ -787,8 +787,8 @@ ou
             if not raw:
                 return None
 
-            # ── 3. Formata os resultados ──
-            # O campo pode ser 'body', 'snippet' ou 'content' dependendo da versão
+            # 3. Formata os resultados
+            # o campo pode ser 'body', 'snippet' ou 'content' dependendo da versão
             linhas = []
             for i, r in enumerate(raw[:4], 1):
                 titulo = r.get("title", "Sem título")
@@ -799,7 +799,7 @@ ou
             formatado = "\n\n".join(linhas)
 
             return (
-                f"[SISTEMA — Resultados de busca web para '{query}':\n\n"
+                f"[SISTEMA, Resultados de busca web para '{query}':\n\n"
                 f"{formatado}\n\n"
                 f"Use estas informações atualizadas para responder ao usuário de "
                 f"forma natural. Cite as fontes quando relevante (ex: 'segundo o "
@@ -816,7 +816,7 @@ ou
         """Gera um título curto para a sessão se ela ainda tiver o nome padrão.
 
         Roda de forma best-effort: se falhar (rede, quota, etc), a sessão
-        simplesmente continua com o nome padrão — não derruba o chat.
+        simplesmente continua com o nome padrão, não derruba o chat.
         """
         try:
             sessoes = listar_sessoes()
@@ -832,7 +832,7 @@ ou
                 "prefixos como 'Título:'. Responda APENAS com o título."
             )
             titulo = chamar_gemini_simples(system, primeira_msg[:500]).strip()
-            # Limpa aspas e eventuais aspas envolvendo o título
+            # limpa aspas e eventuais aspas envolvendo o título
             titulo = titulo.strip("\"'").strip()
             if len(titulo) > 60:
                 titulo = titulo[:57] + "..."
@@ -869,9 +869,9 @@ ou
             if resultado.get("ok"):
                 operacao = resultado["data"]["operacao"]
                 if operacao == "gerar_ia":
-                    resposta_texto = "✅ Prontinho! Editei a imagem como você pediu."
+                    resposta_texto = " Prontinho! Editei a imagem como você pediu."
                 else:
-                    resposta_texto = f"✅ Prontinho! Apliquei: {operacao.replace('_', ' ')}."
+                    resposta_texto = f" Prontinho! Apliquei: {operacao.replace('_', ' ')}."
 
                 salvar_mensagem(sessao_id, "user", mensagem or "[imagem enviada]")
                 salvar_mensagem(sessao_id, "assistant", resposta_texto)
@@ -883,7 +883,7 @@ ou
                     "caminho": resultado["data"]["caminho"]
                 })
             else:
-                # Não foi reconhecido como pedido de edição — conversa normal com visão
+                # não foi reconhecido como pedido de edição, conversa normal com visão
                 return self.enviar_mensagem(sessao_id, mensagem, imagem_b64)
 
         except Exception as e:
@@ -895,7 +895,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Tarefas ───────────────────────────────────────────────────────────────
+    # tarefas
 
     def get_tarefas(self, projeto_id=None, status=None):
         try:
@@ -925,7 +925,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Projetos ──────────────────────────────────────────────────────────────
+    # projetos
 
     def get_projetos(self):
         try:
@@ -947,7 +947,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Lembretes ─────────────────────────────────────────────────────────────
+    # lembretes
 
     def get_lembretes(self):
         try:
@@ -970,7 +970,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Hábitos ───────────────────────────────────────────────────────────────
+    # hábitos
 
     def get_habitos(self):
         try:
@@ -978,7 +978,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    def criar_habito(self, nome: str, icone: str = "⭐", cor: str = "#7c6fff"):
+    def criar_habito(self, nome: str, icone: str = "", cor: str = "#7c6fff"):
         try:
             hid = criar_habito(nome, icone, cor)
             return self._ok({"id": hid})
@@ -999,7 +999,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Foco ──────────────────────────────────────────────────────────────────
+    # foco
 
     def get_stats_foco(self):
         try:
@@ -1014,7 +1014,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Resumo ────────────────────────────────────────────────────────────────
+    # resumo
 
     def get_resumo(self):
         try:
@@ -1022,7 +1022,7 @@ ou
         except Exception as e:
             return self._erro(e)
 
-    # ── Imagens ───────────────────────────────────────────────────────────────
+    # imagens
 
     def processar_imagem(self, caminho: str, operacao: str, params: dict = None):
         try:
@@ -1108,11 +1108,11 @@ Se FOR um pedido de edição, escolha a operação mais adequada:
 - trocar_fundo: troca o fundo por uma cor sólida específica. params: {{"cor": "#rrggbb"}}
 - melhorar: melhora nitidez, brilho, contraste e saturação. params opcionais (0.5 a 4.0): {{"nitidez": 2.0, "brilho": 1.1, "contraste": 1.2, "cor": 1.1}}
 - aumentar: aumenta a resolução. params: {{"escala": 2}} (2, 3 ou 4)
-- instagram: redimensiona para um formato do Instagram. params: {{"formato": "..."}} — exatamente uma destas: {formatos}
-- gerar_ia: QUALQUER OUTRO pedido de edição que não se encaixe acima — trocar cenário/fundo por algo específico, adicionar ou remover objetos, mudar roupas, mudar estilo artístico, mudar clima/iluminação, transformações criativas em geral.
+- instagram: redimensiona para um formato do Instagram. params: {{"formato": "..."}}, exatamente uma destas: {formatos}
+- gerar_ia: QUALQUER OUTRO pedido de edição que não se encaixe acima, trocar cenário/fundo por algo específico, adicionar ou remover objetos, mudar roupas, mudar estilo artístico, mudar clima/iluminação, transformações criativas em geral.
   params: {{"prompt": "...", "forca": 0.55}}
   - "prompt": traduza e reescreva o pedido do usuário como um prompt CURTO e DESCRITIVO em INGLÊS, no estilo usado para Stable Diffusion (ex: "a photo of a person wearing a formal business suit, professional lighting").
-  - "forca": de 0.3 a 0.8 — use valores baixos (0.3-0.4) para mudanças sutis (cor, iluminação, pequenos ajustes) e valores altos (0.6-0.8) para mudanças grandes (trocar cenário inteiro, trocar roupa, mudar estilo).
+  - "forca": de 0.3 a 0.8, use valores baixos (0.3-0.4) para mudanças sutis (cor, iluminação, pequenos ajustes) e valores altos (0.6-0.8) para mudanças grandes (trocar cenário inteiro, trocar roupa, mudar estilo).
 
 Responda APENAS com um JSON válido, sem texto antes ou depois, sem markdown."""
 
@@ -1202,7 +1202,7 @@ com o prompt em inglês, sem explicações, sem aspas, sem texto adicional."""
         except Exception as e:
             return self._erro(e)
         
-            # ── Tema (salvar/carregar) ─────────────────────────────────────────────────
+            # tema (salvar/carregar)
     def salvar_tema(self, tema: str):
         try:
             import database

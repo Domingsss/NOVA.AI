@@ -6,9 +6,9 @@ import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 import io
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CAMINHOS DOS MODELOS
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# caminhos dos modelos
+
 
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
@@ -21,9 +21,9 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 OUTPUT_DIR = os.path.join(BASE_DIR, "imagens_editadas")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# REMOVER FUNDO (rembg)
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# rEMOVER FUNDO (rembg)
+
 
 def remover_fundo(caminho_entrada: str, caminho_saida: str = None) -> str:
     """Remove o fundo de uma imagem usando rembg."""
@@ -47,9 +47,9 @@ def remover_fundo(caminho_entrada: str, caminho_saida: str = None) -> str:
         raise RuntimeError(f"Erro ao remover fundo: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# MELHORAR QUALIDADE (PIL — sem modelo pesado)
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# mELHORAR QUALIDADE (PIL, sem modelo pesado)
+
 
 def melhorar_qualidade(caminho_entrada: str, caminho_saida: str = None,
                         nitidez: float = 2.0, brilho: float = 1.1,
@@ -63,7 +63,7 @@ def melhorar_qualidade(caminho_entrada: str, caminho_saida: str = None,
         img = ImageEnhance.Contrast(img).enhance(contraste)
         img = ImageEnhance.Color(img).enhance(cor)
 
-        # Leve desfoque para suavizar ruído antes de nitidez final
+        # leve desfoque pra suavizar ruído antes de nitidez final
         img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=150, threshold=3))
 
         if not caminho_saida:
@@ -76,14 +76,14 @@ def melhorar_qualidade(caminho_entrada: str, caminho_saida: str = None,
         raise RuntimeError(f"Erro ao melhorar qualidade: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# AUMENTAR RESOLUÇÃO (Real-ESRGAN via onnxruntime)
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# aUMENTAR RESOLUÇÃO (Real-ESRGAN via onnxruntime)
+
 
 ESRGAN_URL  = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip"
 ESRGAN_MODEL = os.path.join(MODELS_DIR, "realesrgan.onnx")
 
-# Fallback leve: upscale com PIL (Lanczos)
+# fallback leve: upscale com PIL (Lanczos)
 def aumentar_resolucao(caminho_entrada: str, escala: int = 2,
                         caminho_saida: str = None) -> str:
     """Aumenta resolução da imagem. Usa ONNX se disponível, senão PIL Lanczos."""
@@ -92,7 +92,7 @@ def aumentar_resolucao(caminho_entrada: str, escala: int = 2,
         w, h = img.size
         nova_w, nova_h = w * escala, h * escala
 
-        # Tenta usar onnxruntime com modelo se disponível
+        # tenta usar onnxruntime com modelo se disponível
         if os.path.exists(ESRGAN_MODEL):
             try:
                 import onnxruntime as ort
@@ -118,9 +118,9 @@ def aumentar_resolucao(caminho_entrada: str, escala: int = 2,
         raise RuntimeError(f"Erro ao aumentar resolução: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# AJUSTES INSTAGRAM (redimensionar + otimizar)
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# aJUSTES INSTAGRAM (redimensionar + otimizar)
+
 
 FORMATOS_INSTAGRAM = {
     "Feed quadrado (1:1)":   (1080, 1080),
@@ -137,7 +137,7 @@ def otimizar_instagram(caminho_entrada: str, formato: str = "Feed quadrado (1:1)
         img = Image.open(caminho_entrada).convert("RGB")
         alvo_w, alvo_h = FORMATOS_INSTAGRAM.get(formato, (1080, 1080))
 
-        # Crop centralizado mantendo proporção
+        # crop centralizado mantendo proporção
         ratio_alvo = alvo_w / alvo_h
         ratio_img  = img.width / img.height
 
@@ -164,9 +164,9 @@ def otimizar_instagram(caminho_entrada: str, formato: str = "Feed quadrado (1:1)
         raise RuntimeError(f"Erro ao otimizar para Instagram: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# TROCAR COR DE FUNDO
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# trocar cor de fundo
+
 
 def trocar_fundo_cor(caminho_entrada: str, cor: tuple = (255, 255, 255),
                       caminho_saida: str = None) -> str:
@@ -192,9 +192,9 @@ def trocar_fundo_cor(caminho_entrada: str, cor: tuple = (255, 255, 255),
         raise RuntimeError(f"Erro ao trocar fundo: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# UTILITÁRIOS
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# utilitários
+
 
 def listar_editadas() -> list:
     """Lista todas as imagens editadas na pasta de saída."""

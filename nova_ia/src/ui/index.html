@@ -1,382 +1,966 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>NOVA</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=20261017-solar"/>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<link rel="stylesheet" href="solar.css?v=1"/>
-</head>
-<body class="sidebar-collapsed">
-
-<div id="splash">
-  <div class="splash-logo">NOVA</div>
-  <div class="splash-spinner"></div>
-</div>
-
-<!-- Botão flutuante pra mostrar/esconder sidebar (sempre visível) -->
-<button id="sidebar-toggle" onclick="toggleSidebar()" title="Mostrar/esconder lateral (Ctrl+B)">
-  <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-</button>
-
-<aside id="sidebar">
-  <div id="sidebar-logo">
-    <svg class="logo-mark" viewBox="0 0 40 40" fill="none">
-      <defs>
-        <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#7c3aed"/>
-          <stop offset="50%" stop-color="#c026d3"/>
-          <stop offset="100%" stop-color="#f59e0b"/>
-        </linearGradient>
-      </defs>
-      <circle cx="20" cy="20" r="18" stroke="url(#logo-grad)" stroke-width="2" opacity="0.3"/>
-      <circle cx="20" cy="20" r="12" stroke="url(#logo-grad)" stroke-width="2" opacity="0.5"/>
-      <circle cx="20" cy="20" r="6" fill="url(#logo-grad)"/>
-      <circle cx="20" cy="20" r="2" fill="#fff"/>
-    </svg>
-    <span class="logo-text">NOVA</span>
-    <span class="logo-dot">●</span>
-  </div>
-
-  <button id="btn-nova-conversa">
-    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Nova conversa
-  </button>
-
-  <div class="sidebar-section-label">CONVERSAS</div>
-  <div id="lista-sessoes"></div>
-
-  <div class="sidebar-section-label rotinas-label">ROTINAS</div>
-  <nav id="nav">
-    <button class="nav-btn active" data-aba="chat">
-      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span class="nav-label">Início</span>
-    </button>
-    <button class="nav-btn" data-aba="tarefas">
-      <svg class="nav-icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      <span class="nav-label">Tarefas</span>
-      <span class="nav-badge" id="badge-tarefas" style="display:none">0</span>
-    </button>
-    <button class="nav-btn" data-aba="lembretes">
-      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <span class="nav-label">Lembretes</span>
-      <span class="nav-badge" id="badge-lembretes" style="display:none">0</span>
-    </button>
-    <button class="nav-btn" data-aba="foco">
-      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-      <span class="nav-label">Foco</span>
-    </button>
-    <button class="nav-btn" data-aba="habitos">
-      <svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span class="nav-label">Hábitos</span>
-    </button>
-    <button class="nav-btn" data-aba="imagens">
-      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      <span class="nav-label">Imagens</span>
-    </button>
-  </nav>
-
-  <div id="sidebar-footer">
-    <button class="footer-btn" onclick="abrirModalConfig()">
-      <span class="key-dot" id="key-dot"></span>
-      <svg class="footer-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      <span>Configurações</span>
-    </button>
-  </div>
-</aside>
-
-<div id="sidebar-resizer"></div>
-
-<main id="conteudo">
-  <div id="chat-particles" aria-hidden="true"></div>
-  <header id="app-topbar">
-    <button class="topbar-search" onclick="document.getElementById('chat-input').focus(); trocarAba('chat')">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.5" y2="16.5"/></svg>
-      <span>Buscar ou executar...</span><kbd>Ctrl K</kbd>
-    </button>
-    <div class="topbar-actions"><button title="Notificações">♧</button><button id="topbar-voice" onclick="toggleVozNova()" title="Ativar/desativar voz da NOVA">◖</button><button id="topbar-mic" onclick="toggleGravacao()" title="Conversar por voz">♩</button></div>
-  </header>
-  <section id="aba-dashboard" class="aba">
-    <div class="dashboard-header">
-      <div>
-        <div class="dashboard-kicker">CENTRAL DA NOVA</div>
-        <h1 id="dashboard-saudacao">Olá, chefe.</h1>
-        <p id="dashboard-data">Carregando seu resumo...</p>
-        <div id="dashboard-insight"><span>◉</span><p>Preparando seu panorama do dia...</p></div>
-      </div>
-      <button class="dashboard-refresh" onclick="carregarDashboard(true)" title="Atualizar dashboard">↻</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css?v=20261017-solar" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="solar.css?v=1" />
+  </head>
+  <body class="sidebar-collapsed">
+    <div id="splash">
+      <div class="splash-logo">NOVA</div>
+      <div class="splash-spinner"></div>
     </div>
-    <div id="dashboard-grid">
-      <article class="dash-card dash-weather">
-        <div class="dash-card-label">CLIMA AGORA</div>
-        <div id="dash-clima" class="dash-loading">Consultando o céu...</div>
-        <div class="dash-source">Dados: Open-Meteo</div>
-      </article>
-      <article class="dash-card dash-finance">
-        <div class="dash-card-label">MERCADO</div>
-        <div id="dash-financas" class="dash-loading">Buscando cotações...</div>
-        <div class="dash-source">Frankfurter + CoinGecko · pode haver atraso</div>
-      </article>
-      <article class="dash-card dash-tasks">
-        <div class="dash-card-head"><div><div class="dash-card-label">TAREFAS DE HOJE</div><div id="dash-task-progress" class="mini-progress"><i></i><span>0/0</span></div></div><button onclick="trocarAba('tarefas')">Ver tudo →</button></div>
-        <div id="dash-tarefas" class="dashboard-list dash-loading">Carregando tarefas...</div>
-      </article>
-      <article class="dash-card dash-habits">
-        <div class="dash-card-head"><div class="dash-card-label">HÁBITOS · STREAK</div><button onclick="trocarAba('habitos')">Ver tudo →</button></div>
-        <div id="dash-habitos" class="dashboard-list dash-loading">Carregando hábitos...</div>
-      </article>
-      <article class="dash-card dash-shortcuts">
-        <div class="dash-card-label">ATALHOS RÁPIDOS</div>
-        <div class="quick-actions">
-          <button onclick="novaConversa(); trocarAba('chat')"><span>＋</span><div><strong>Nova conversa</strong><small>Começar do zero</small></div></button>
-          <button onclick="trocarAba('tarefas')"><span>✓</span><div><strong>Tarefas</strong><small>Ver pendências</small></div></button>
-          <button onclick="trocarAba('foco')"><span>◎</span><div><strong>Modo foco</strong><small>Iniciar Pomodoro</small></div></button>
-        </div>
-      </article>
-      <article class="dash-card dash-system">
-        <div class="dash-card-label">SYSTEM FETCH</div>
-        <div id="dash-sistema" class="neofetch-panel dash-loading">Lendo a máquina...</div>
-      </article>
-    </div>
-    <div class="dashboard-footer"><span id="dashboard-atualizado">—</span><span class="online-pill">● SISTEMAS ONLINE</span></div>
-  </section>
 
-  <section id="aba-chat" class="aba active">
-    <div id="chat-progress-bar"></div>
-    <div id="chat-header">
-      <div class="chat-header-avatar">N</div>
-      <div class="chat-header-info">
-        <div class="chat-header-name">NOVA</div>
-        <div class="chat-header-status">
-          <span class="status-dot"></span>
-          <span>online</span>
-        </div>
-      </div>
-      <div class="chat-header-actions">
-        <div class="theme-switcher" onclick="toggleTheme()" title="Alternar tema">
-          <svg class="theme-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <div class="toggle" id="header-theme-toggle"></div>
-          <svg class="theme-ico" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </div>
-      </div>
-    </div>
-    <div id="nova-presence" data-state="idle">
-      <button class="nova-orb" id="nova-universe-toggle" type="button" aria-label="Explorar o sistema NOVA" aria-expanded="false" aria-controls="aba-solar" title="Explorar o sistema NOVA"><canvas id="nova-orb-canvas" aria-hidden="true"></canvas></button>
-      <div class="nova-presence-copy"><span class="nova-presence-name">N O V A</span><h2>Por onde começamos?</h2><p class="nova-universe-hint">Clique no buraco negro para explorar seu sistema solar.</p></div>
-      <p id="nova-presence-status" role="status">Estou aqui. Pode falar.</p>
-    </div>
-    <div id="chat-msgs"></div>
-    <button id="scroll-bottom-btn" onclick="scrollChatBottom()" title="Ir para o final">
-      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    <!-- abre e fecha a lateral sem sair da conversa. -->
+    <button
+      id="sidebar-toggle"
+      onclick="toggleSidebar()"
+      title="Mostrar/esconder lateral (Ctrl+B)"
+    >
+      <svg viewBox="0 0 24 24">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
     </button>
-    <div id="chat-input-area">
-      <div id="chat-input-wrap">
-        <label id="btn-anexar" title="Anexar imagem">
-          <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-          <input type="file" id="chat-imagem" accept="image/*" style="display:none" onchange="previewImagem(event)"/>
-        </label>
-        <div id="chat-preview-wrap" style="display:none">
-          <img id="chat-preview-img" src="" alt=""/>
-          <button onclick="removerImagem()">✕</button>
-        </div>
-        <textarea id="chat-input" placeholder="Fale com a NOVA..." rows="2"></textarea>
-        <button id="chat-mic" onclick="toggleGravacao()" title="Conversar por voz">
-          <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
-        </button>
-        <button id="chat-send">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-        </button>
-      </div>
-      <div id="voice-status" aria-live="polite"></div>
-    </div>
-  </section>
 
-  <section id="aba-tarefas" class="aba">
-    <div class="painel-header">
-      <div class="painel-titulo">
-        <div class="painel-icon-wrap"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-        <div class="painel-titulo-texto"><h2>Tarefas</h2><div class="painel-subtitle" id="subtitle-tarefas">Organize suas pendências</div></div>
-      </div>
-      <button class="btn-primary" onclick="abrirModalTarefa()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nova tarefa</button>
-    </div>
-    <div id="lista-tarefas"></div>
-  </section>
-
-  <section id="aba-lembretes" class="aba">
-    <div class="painel-header">
-      <div class="painel-titulo">
-        <div class="painel-icon-wrap"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-        <div class="painel-titulo-texto"><h2>Lembretes</h2><div class="painel-subtitle" id="subtitle-lembretes">Não esqueça do importante</div></div>
-      </div>
-      <button class="btn-primary" onclick="abrirModalLembrete()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Novo lembrete</button>
-    </div>
-    <div id="lista-lembretes"></div>
-  </section>
-
-  <section id="aba-foco" class="aba">
-    <div class="painel-header">
-      <div class="painel-titulo">
-        <div class="painel-icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
-        <div class="painel-titulo-texto"><h2>Modo Foco</h2><div class="painel-subtitle">Pomodoro pra concentragem total</div></div>
-      </div>
-    </div>
-    <div id="foco-centro">
-      <div class="foco-ring-wrap">
-        <svg id="foco-ring" viewBox="0 0 240 240">
-          <defs><linearGradient id="foco-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#7c3aed"/><stop offset="50%" stop-color="#c026d3"/><stop offset="100%" stop-color="#f59e0b"/></linearGradient></defs>
-          <circle class="ring-bg" cx="120" cy="120" r="110"/>
-          <circle class="ring-fg" cx="120" cy="120" r="110"/>
+    <aside id="sidebar">
+      <div id="sidebar-logo">
+        <svg class="logo-mark" viewBox="0 0 40 40" fill="none">
+          <defs>
+            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#7c3aed" />
+              <stop offset="50%" stop-color="#c026d3" />
+              <stop offset="100%" stop-color="#f59e0b" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx="20"
+            cy="20"
+            r="18"
+            stroke="url(#logo-grad)"
+            stroke-width="2"
+            opacity="0.3"
+          />
+          <circle
+            cx="20"
+            cy="20"
+            r="12"
+            stroke="url(#logo-grad)"
+            stroke-width="2"
+            opacity="0.5"
+          />
+          <circle cx="20" cy="20" r="6" fill="url(#logo-grad)" />
+          <circle cx="20" cy="20" r="2" fill="#fff" />
         </svg>
-        <div id="foco-fase">FOCO</div>
-        <div id="foco-timer">25:00</div>
+        <span class="logo-text">NOVA</span>
+        <span class="logo-dot">●</span>
       </div>
-      <div id="foco-stats"></div>
-      <div id="foco-config">
-        <label>Foco (min) <input id="foco-min" type="number" value="25" min="1" max="120"/></label>
-        <label>Pausa (min) <input id="pausa-min" type="number" value="5" min="1" max="60"/></label>
+
+      <button id="btn-nova-conversa">
+        <svg viewBox="0 0 24 24">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Nova conversa
+      </button>
+
+      <div class="sidebar-section-label">CONVERSAS</div>
+      <div id="lista-sessoes"></div>
+
+      <div class="sidebar-section-label rotinas-label">ROTINAS</div>
+      <nav id="nav">
+        <button class="nav-btn active" data-aba="chat">
+          <svg class="nav-icon" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          <span class="nav-label">Início</span>
+        </button>
+        <button class="nav-btn" data-aba="tarefas">
+          <svg class="nav-icon" viewBox="0 0 24 24">
+            <polyline points="9 11 12 14 22 4" />
+            <path
+              d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+            />
+          </svg>
+          <span class="nav-label">Tarefas</span>
+          <span class="nav-badge" id="badge-tarefas" style="display: none"
+            >0</span
+          >
+        </button>
+        <button class="nav-btn" data-aba="lembretes">
+          <svg class="nav-icon" viewBox="0 0 24 24">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          <span class="nav-label">Lembretes</span>
+          <span class="nav-badge" id="badge-lembretes" style="display: none"
+            >0</span
+          >
+        </button>
+        <button class="nav-btn" data-aba="foco">
+          <svg class="nav-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="6" />
+            <circle cx="12" cy="12" r="2" />
+          </svg>
+          <span class="nav-label">Foco</span>
+        </button>
+        <button class="nav-btn" data-aba="habitos">
+          <svg class="nav-icon" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          <span class="nav-label">Hábitos</span>
+        </button>
+        <button class="nav-btn" data-aba="imagens">
+          <svg class="nav-icon" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          <span class="nav-label">Imagens</span>
+        </button>
+      </nav>
+
+      <div id="sidebar-footer">
+        <button class="footer-btn" onclick="abrirModalConfig()">
+          <span class="key-dot" id="key-dot"></span>
+          <svg class="footer-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+            />
+          </svg>
+          <span>Configurações</span>
+        </button>
       </div>
-      <div id="foco-btns">
-        <button id="btn-foco-iniciar" class="btn-primary" onclick="focoIniciar()">▶ Iniciar</button>
-        <button id="btn-foco-pausar" class="btn-secondary" onclick="focoPausar()" disabled>⏸ Pausar</button>
-        <button id="btn-foco-cancelar" class="btn-danger" onclick="focoCancelar()" disabled>✕ Cancelar</button>
+    </aside>
+
+    <div id="sidebar-resizer"></div>
+
+    <main id="conteudo">
+      <div id="chat-particles" aria-hidden="true"></div>
+      <header id="app-topbar">
+        <button
+          class="topbar-search"
+          onclick="document.getElementById('chat-input').focus(); trocarAba('chat')"
+        >
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="20" y1="20" x2="16.5" y2="16.5" />
+          </svg>
+          <span>Buscar ou executar...</span><kbd>Ctrl K</kbd>
+        </button>
+        <div class="topbar-actions">
+          <button title="Notificações">Avisos</button
+          ><button
+            id="topbar-voice"
+            onclick="toggleVozNova()"
+            title="Ativar/desativar voz da NOVA"
+          >
+            ◖</button
+          ><button
+            id="topbar-mic"
+            onclick="toggleGravacao()"
+            title="Conversar por voz"
+          >
+            Microfone
+          </button>
+        </div>
+      </header>
+      <section id="aba-dashboard" class="aba">
+        <div class="dashboard-header">
+          <div>
+            <h1 id="dashboard-saudacao">Olá, chefe.</h1>
+            <p id="dashboard-data">Carregando seu resumo...</p>
+            <div id="dashboard-insight">
+              <span>◉</span>
+              <p>Preparando seu panorama do dia...</p>
+            </div>
+          </div>
+          <button
+            class="dashboard-refresh"
+            onclick="carregarDashboard(true)"
+            title="Atualizar dashboard"
+          >
+            ↻
+          </button>
+        </div>
+        <div id="dashboard-grid">
+          <article class="dash-card dash-weather">
+            <div class="dash-card-label">CLIMA AGORA</div>
+            <div id="dash-clima" class="dash-loading">Consultando o céu...</div>
+            <div class="dash-source">Dados: Open-Meteo</div>
+          </article>
+          <article class="dash-card dash-finance">
+            <div class="dash-card-label">MERCADO</div>
+            <div id="dash-financas" class="dash-loading">
+              Buscando cotações...
+            </div>
+            <div class="dash-source">
+              Frankfurter + CoinGecko · pode haver atraso
+            </div>
+          </article>
+          <article class="dash-card dash-tasks">
+            <div class="dash-card-head">
+              <div>
+                <div class="dash-card-label">TAREFAS DE HOJE</div>
+                <div id="dash-task-progress" class="mini-progress">
+                  <i></i><span>0/0</span>
+                </div>
+              </div>
+              <button onclick="trocarAba('tarefas')">Ver tudo →</button>
+            </div>
+            <div id="dash-tarefas" class="dashboard-list dash-loading">
+              Carregando tarefas...
+            </div>
+          </article>
+          <article class="dash-card dash-habits">
+            <div class="dash-card-head">
+              <div class="dash-card-label">HÁBITOS · STREAK</div>
+              <button onclick="trocarAba('habitos')">Ver tudo →</button>
+            </div>
+            <div id="dash-habitos" class="dashboard-list dash-loading">
+              Carregando hábitos...
+            </div>
+          </article>
+          <article class="dash-card dash-shortcuts">
+            <div class="dash-card-label">ATALHOS RÁPIDOS</div>
+            <div class="quick-actions">
+              <button onclick="novaConversa(); trocarAba('chat')">
+                <span>＋</span>
+                <div>
+                  <strong>Nova conversa</strong><small>Começar do zero</small>
+                </div>
+              </button>
+              <button onclick="trocarAba('tarefas')">
+                <span>✓</span>
+                <div><strong>Tarefas</strong><small>Ver pendências</small></div>
+              </button>
+              <button onclick="trocarAba('foco')">
+                <span>◎</span>
+                <div>
+                  <strong>Modo foco</strong><small>Iniciar Pomodoro</small>
+                </div>
+              </button>
+            </div>
+          </article>
+          <article class="dash-card dash-system">
+            <div class="dash-card-label">SYSTEM FETCH</div>
+            <div id="dash-sistema" class="neofetch-panel dash-loading">
+              Lendo a máquina...
+            </div>
+          </article>
+        </div>
+        <div class="dashboard-footer">
+          <span id="dashboard-atualizado">,</span
+          ><span class="online-pill">● SISTEMAS ONLINE</span>
+        </div>
+      </section>
+
+      <section id="aba-chat" class="aba active">
+        <div id="chat-progress-bar"></div>
+        <div id="chat-header">
+          <div class="chat-header-avatar">N</div>
+          <div class="chat-header-info">
+            <div class="chat-header-name">NOVA</div>
+            <div class="chat-header-status">
+              <span class="status-dot"></span>
+              <span>online</span>
+            </div>
+          </div>
+          <div class="chat-header-actions">
+            <div
+              class="theme-switcher"
+              onclick="toggleTheme()"
+              title="Alternar tema"
+            >
+              <svg class="theme-ico" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+              <div class="toggle" id="header-theme-toggle"></div>
+              <svg class="theme-ico" viewBox="0 0 24 24">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div id="nova-presence" data-state="idle">
+          <button
+            class="nova-orb"
+            id="nova-universe-toggle"
+            type="button"
+            aria-label="Explorar o sistema NOVA"
+            aria-expanded="false"
+            aria-controls="aba-solar"
+            title="Explorar o sistema NOVA"
+          >
+            <canvas id="nova-orb-canvas" aria-hidden="true"></canvas>
+          </button>
+          <div class="nova-presence-copy">
+            <span class="nova-presence-name">N O V A</span>
+            <h2>Por onde começamos?</h2>
+            <p class="nova-universe-hint">
+              Clique no buraco negro para explorar seu sistema solar.
+            </p>
+          </div>
+          <p id="nova-presence-status" role="status">Estou aqui. Pode falar.</p>
+        </div>
+        <div id="chat-msgs"></div>
+        <button
+          id="scroll-bottom-btn"
+          onclick="scrollChatBottom()"
+          title="Ir para o final"
+        >
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" /></svg>
+        </button>
+        <div id="chat-input-area">
+          <div id="chat-input-wrap">
+            <label id="btn-anexar" title="Anexar imagem">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                />
+              </svg>
+              <input
+                type="file"
+                id="chat-imagem"
+                accept="image/*"
+                style="display: none"
+                onchange="previewImagem(event)"
+              />
+            </label>
+            <div id="chat-preview-wrap" style="display: none">
+              <img id="chat-preview-img" src="" alt="" />
+              <button onclick="removerImagem()">✕</button>
+            </div>
+            <textarea
+              id="chat-input"
+              placeholder="Fale com a NOVA..."
+              rows="2"
+            ></textarea>
+            <button
+              id="chat-mic"
+              onclick="toggleGravacao()"
+              title="Conversar por voz"
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
+              </svg>
+            </button>
+            <button id="chat-send">
+              <svg viewBox="0 0 24 24">
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          </div>
+          <div id="voice-status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section id="aba-tarefas" class="aba">
+        <div class="painel-header">
+          <div class="painel-titulo">
+            <div class="painel-icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <polyline points="9 11 12 14 22 4" />
+                <path
+                  d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                />
+              </svg>
+            </div>
+            <div class="painel-titulo-texto">
+              <h2>Tarefas</h2>
+              <div class="painel-subtitle" id="subtitle-tarefas">
+                Organize suas pendências
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="abrirModalTarefa()">
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Nova tarefa
+          </button>
+        </div>
+        <div id="lista-tarefas"></div>
+      </section>
+
+      <section id="aba-lembretes" class="aba">
+        <div class="painel-header">
+          <div class="painel-titulo">
+            <div class="painel-icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <div class="painel-titulo-texto">
+              <h2>Lembretes</h2>
+              <div class="painel-subtitle" id="subtitle-lembretes">
+                Não esqueça do importante
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="abrirModalLembrete()">
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Novo lembrete
+          </button>
+        </div>
+        <div id="lista-lembretes"></div>
+      </section>
+
+      <section id="aba-foco" class="aba">
+        <div class="painel-header">
+          <div class="painel-titulo">
+            <div class="painel-icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="2" />
+              </svg>
+            </div>
+            <div class="painel-titulo-texto">
+              <h2>Modo Foco</h2>
+              <div class="painel-subtitle">Pomodoro pra concentragem total</div>
+            </div>
+          </div>
+        </div>
+        <div id="foco-centro">
+          <div class="foco-ring-wrap">
+            <svg id="foco-ring" viewBox="0 0 240 240">
+              <defs>
+                <linearGradient
+                  id="foco-grad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stop-color="#7c3aed" />
+                  <stop offset="50%" stop-color="#c026d3" />
+                  <stop offset="100%" stop-color="#f59e0b" />
+                </linearGradient>
+              </defs>
+              <circle class="ring-bg" cx="120" cy="120" r="110" />
+              <circle class="ring-fg" cx="120" cy="120" r="110" />
+            </svg>
+            <div id="foco-fase">FOCO</div>
+            <div id="foco-timer">25:00</div>
+          </div>
+          <div id="foco-stats"></div>
+          <div id="foco-config">
+            <label
+              >Foco (min)
+              <input id="foco-min" type="number" value="25" min="1" max="120"
+            /></label>
+            <label
+              >Pausa (min)
+              <input id="pausa-min" type="number" value="5" min="1" max="60"
+            /></label>
+          </div>
+          <div id="foco-btns">
+            <button
+              id="btn-foco-iniciar"
+              class="btn-primary"
+              onclick="focoIniciar()"
+            >
+              Iniciar
+            </button>
+            <button
+              id="btn-foco-pausar"
+              class="btn-secondary"
+              onclick="focoPausar()"
+              disabled
+            >
+              Pausar
+            </button>
+            <button
+              id="btn-foco-cancelar"
+              class="btn-danger"
+              onclick="focoCancelar()"
+              disabled
+            >
+              ✕ Cancelar
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="aba-habitos" class="aba">
+        <div class="painel-header">
+          <div class="painel-titulo">
+            <div class="painel-icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </div>
+            <div class="painel-titulo-texto">
+              <h2>Hábitos</h2>
+              <div class="painel-subtitle" id="subtitle-habitos">
+                Mantenha a consistência
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="abrirModalHabito()">
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Novo hábito
+          </button>
+        </div>
+        <div id="lista-habitos"></div>
+      </section>
+
+      <section id="aba-imagens" class="aba">
+        <div class="painel-header">
+          <div class="painel-titulo">
+            <div class="painel-icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </div>
+            <div class="painel-titulo-texto">
+              <h2>Imagens</h2>
+              <div class="painel-subtitle">Edite e otimize suas fotos</div>
+            </div>
+          </div>
+          <button
+            class="btn-secondary"
+            onclick="chamarAPI('abrir_pasta_editadas')"
+          >
+            Ver editadas
+          </button>
+        </div>
+        <div id="imagens-corpo">
+          <div id="imagens-preview-area">
+            <button class="btn-primary" onclick="selecionarImagem()">
+              <svg viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Selecionar imagem
+            </button>
+            <div id="imagens-preview-wrap">
+              <img id="imagens-preview" src="" alt="" style="display: none" />
+              <p id="imagens-placeholder">Nenhuma imagem selecionada</p>
+            </div>
+            <p id="imagens-info"></p>
+            <p id="imagens-status"></p>
+          </div>
+          <div id="imagens-controles">
+            <div class="ctrl-secao">Remover fundo</div>
+            <button
+              class="btn-primary"
+              onclick="processarImagem('remover_fundo')"
+            >
+              Remover fundo
+            </button>
+            <div class="ctrl-secao">Trocar fundo por cor</div>
+            <div class="ctrl-linha">
+              <input type="color" id="cor-fundo" value="#ffffff" /><span
+                id="cor-fundo-label"
+                >#ffffff</span
+              >
+            </div>
+            <button
+              class="btn-primary"
+              onclick="processarImagem('trocar_fundo')"
+            >
+              Aplicar cor
+            </button>
+            <div class="ctrl-secao">Melhorar qualidade</div>
+            <div class="slider-wrap">
+              <label>Nitidez <span id="val-nitidez">2.0</span></label
+              ><input
+                type="range"
+                id="sl-nitidez"
+                min="1"
+                max="4"
+                step="0.1"
+                value="2"
+                oninput="document.getElementById('val-nitidez').textContent=this.value"
+              />
+            </div>
+            <div class="slider-wrap">
+              <label>Brilho <span id="val-brilho">1.1</span></label
+              ><input
+                type="range"
+                id="sl-brilho"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value="1.1"
+                oninput="document.getElementById('val-brilho').textContent=this.value"
+              />
+            </div>
+            <div class="slider-wrap">
+              <label>Contraste <span id="val-contraste">1.2</span></label
+              ><input
+                type="range"
+                id="sl-contraste"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value="1.2"
+                oninput="document.getElementById('val-contraste').textContent=this.value"
+              />
+            </div>
+            <div class="slider-wrap">
+              <label>Saturação <span id="val-cor">1.1</span></label
+              ><input
+                type="range"
+                id="sl-cor"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value="1.1"
+                oninput="document.getElementById('val-cor').textContent=this.value"
+              />
+            </div>
+            <button class="btn-primary" onclick="processarImagem('melhorar')">
+              Melhorar
+            </button>
+            <div class="ctrl-secao">Aumentar resolução</div>
+            <div class="ctrl-linha">
+              <label
+                ><input type="radio" name="escala" value="2" checked />
+                2x</label
+              ><label><input type="radio" name="escala" value="3" /> 3x</label
+              ><label><input type="radio" name="escala" value="4" /> 4x</label>
+            </div>
+            <button class="btn-primary" onclick="processarImagem('aumentar')">
+              Aumentar
+            </button>
+            <div class="ctrl-secao">Otimizar Instagram</div>
+            <select id="formato-instagram">
+              <option>Feed quadrado (1:1)</option>
+              <option>Feed retrato (4:5)</option>
+              <option>Feed paisagem (1.91:1)</option>
+              <option>Stories (9:16)</option>
+              <option>Reels (9:16)</option>
+            </select>
+            <button class="btn-primary" onclick="processarImagem('instagram')">
+              Otimizar
+            </button>
+            <div id="imagens-instrucao-wrap">
+              <textarea
+                id="imagens-instrucao"
+                placeholder="Descreva como quer editar a foto..."
+                rows="2"
+              ></textarea
+              ><button class="btn-primary" onclick="aplicarEdicaoTexto()">
+                Aplicar edição
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <div id="context-menu">
+      <div class="ctx-item" onclick="ctxCopy()">
+        <svg viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+        Copiar
+      </div>
+      <div class="ctx-item" onclick="ctxRegenerate()">
+        <svg viewBox="0 0 24 24">
+          <polyline points="23 4 23 10 17 10" />
+          <polyline points="1 20 1 14 7 14" />
+          <path
+            d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+          />
+        </svg>
+        Regenerar
+      </div>
+      <div class="ctx-separator"></div>
+      <div class="ctx-item danger" onclick="ctxDelete()">
+        <svg viewBox="0 0 24 24">
+          <polyline points="3 6 5 6 21 6" />
+          <path
+            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+          />
+        </svg>
+        Deletar
       </div>
     </div>
-  </section>
 
-  <section id="aba-habitos" class="aba">
-    <div class="painel-header">
-      <div class="painel-titulo">
-        <div class="painel-icon-wrap"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-        <div class="painel-titulo-texto"><h2>Hábitos</h2><div class="painel-subtitle" id="subtitle-habitos">Mantenha a consistência</div></div>
+    <div class="shortcut-hint" id="shortcut-hint">
+      <kbd>Ctrl</kbd>+<kbd>K</kbd> nova conversa &nbsp;·&nbsp;
+      <kbd>Ctrl</kbd>+<kbd>B</kbd> esconder lateral
+    </div>
+
+    <div id="modal-config" class="modal" style="display: none">
+      <div class="modal-box modal-lg">
+        <h3>Configurações</h3>
+        <div class="modal-section">
+          <div class="modal-section-label">Chat no computador · Ollama</div>
+          <label
+            ><input type="checkbox" id="local-chat-enabled" /> Usar Ollama local
+            nas respostas</label
+          >
+          <label for="local-chat-model">Modelo instalado</label>
+          <input
+            type="text"
+            id="local-chat-model"
+            list="local-chat-models"
+            placeholder="Em branco usa o primeiro modelo instalado"
+          />
+          <datalist id="local-chat-models"></datalist>
+          <button class="btn-secondary" onclick="refreshLocalModels()">
+            Buscar modelos no computador
+          </button>
+          <p class="modal-row-desc" id="local-chat-status">
+            Ollama deve estar aberto. Não precisa de chave. Salve no rodapé para
+            aplicar.
+          </p>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-label">
+            Gemini · usado quando o chat local está desligado
+          </div>
+          <input
+            type="password"
+            id="input-key"
+            placeholder="Cole sua Gemini API key..."
+          />
+          <div class="modal-row">
+            <div>
+              <div class="modal-row-label">API Key configurada</div>
+              <div class="modal-row-desc" id="key-status">Verificando...</div>
+            </div>
+            <div class="key-dot" id="key-dot-modal"></div>
+          </div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-label">APIs adicionais</div>
+          <p class="modal-row-desc">
+            Cadastre serviços de respostas, imagens e vídeos para usar depois. O
+            cadastro não ativa o serviço: cada provedor ainda precisa ser
+            integrado à NOVA.
+          </p>
+          <div id="integration-list" aria-live="polite"></div>
+          <input type="hidden" id="integration-id" />
+          <label for="integration-category">Finalidade</label>
+          <select id="integration-category">
+            <option value="respostas">Respostas</option>
+            <option value="imagens">Imagens</option>
+            <option value="videos">Vídeos</option>
+          </select>
+          <label for="integration-name">Nome do serviço</label>
+          <input
+            type="text"
+            id="integration-name"
+            maxlength="120"
+            placeholder="Nome para identificar a API"
+          />
+          <label for="integration-url">Endereço da API (opcional)</label>
+          <input type="text" id="integration-url" placeholder="https://..." />
+          <label for="integration-model">Modelo (opcional)</label>
+          <input
+            type="text"
+            id="integration-model"
+            placeholder="Identificador do modelo"
+          />
+          <label for="integration-key">Chave da API</label>
+          <input
+            type="password"
+            id="integration-key"
+            autocomplete="new-password"
+            placeholder="Em branco mantém a chave salva"
+          />
+          <label
+            ><input type="checkbox" id="integration-clear-key" /> Remover a
+            chave salva</label
+          >
+          <p class="modal-row-desc">
+            As chaves ficam em um arquivo local neste computador. Não
+            compartilhe a pasta de dados.
+          </p>
+          <div class="modal-btns">
+            <button class="btn-secondary" onclick="resetIntegration()">
+              Novo cadastro</button
+            ><button
+              class="btn-primary"
+              id="integration-save"
+              onclick="saveIntegration()"
+            >
+              Salvar API
+            </button>
+          </div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-label">Dashboard</div>
+          <input
+            type="text"
+            id="input-cidade"
+            placeholder="Cidade do clima"
+            value="Rio de Janeiro"
+          />
+          <div class="modal-row-desc">Cidade usada na previsão do tempo.</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-label">Tema</div>
+          <div class="theme-options">
+            <div
+              class="theme-option"
+              data-theme="light"
+              onclick="setTheme('light')"
+            >
+              Claro
+            </div>
+            <div
+              class="theme-option"
+              data-theme="dark"
+              onclick="setTheme('dark')"
+            >
+              Escuro
+            </div>
+          </div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-label">Aparência</div>
+          <div class="modal-row">
+            <div>
+              <div class="modal-row-label">Partículas cósmicas no chat</div>
+              <div class="modal-row-desc">Estrelinhas flutuando no fundo</div>
+            </div>
+            <div
+              class="toggle on"
+              id="toggle-particles"
+              onclick="toggleSetting('particles', this)"
+            ></div>
+          </div>
+          <div class="modal-row">
+            <div>
+              <div class="modal-row-label">Animações</div>
+              <div class="modal-row-desc">Transições e efeitos visuais</div>
+            </div>
+            <div
+              class="toggle on"
+              id="toggle-animations"
+              onclick="toggleSetting('animations', this)"
+            ></div>
+          </div>
+        </div>
+        <div class="modal-btns">
+          <button class="btn-secondary" onclick="fecharModal('modal-config')">
+            Fechar</button
+          ><button class="btn-primary" onclick="salvarConfig()">Salvar</button>
+        </div>
       </div>
-      <button class="btn-primary" onclick="abrirModalHabito()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Novo hábito</button>
     </div>
-    <div id="lista-habitos"></div>
-  </section>
 
-  <section id="aba-imagens" class="aba">
-    <div class="painel-header">
-      <div class="painel-titulo">
-        <div class="painel-icon-wrap"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
-        <div class="painel-titulo-texto"><h2>Imagens</h2><div class="painel-subtitle">Edite e otimize suas fotos</div></div>
-      </div>
-      <button class="btn-secondary" onclick="chamarAPI('abrir_pasta_editadas')">📂 Ver editadas</button>
-    </div>
-    <div id="imagens-corpo">
-      <div id="imagens-preview-area">
-        <button class="btn-primary" onclick="selecionarImagem()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Selecionar imagem</button>
-        <div id="imagens-preview-wrap"><img id="imagens-preview" src="" alt="" style="display:none"/><p id="imagens-placeholder">Nenhuma imagem selecionada</p></div>
-        <p id="imagens-info"></p>
-        <p id="imagens-status"></p>
-      </div>
-      <div id="imagens-controles">
-        <div class="ctrl-secao">✂️ Remover fundo</div>
-        <button class="btn-primary" onclick="processarImagem('remover_fundo')">Remover fundo</button>
-        <div class="ctrl-secao">🎨 Trocar fundo por cor</div>
-        <div class="ctrl-linha"><input type="color" id="cor-fundo" value="#ffffff"/><span id="cor-fundo-label">#ffffff</span></div>
-        <button class="btn-primary" onclick="processarImagem('trocar_fundo')">Aplicar cor</button>
-        <div class="ctrl-secao">✨ Melhorar qualidade</div>
-        <div class="slider-wrap"><label>Nitidez <span id="val-nitidez">2.0</span></label><input type="range" id="sl-nitidez" min="1" max="4" step="0.1" value="2" oninput="document.getElementById('val-nitidez').textContent=this.value"/></div>
-        <div class="slider-wrap"><label>Brilho <span id="val-brilho">1.1</span></label><input type="range" id="sl-brilho" min="0.5" max="2" step="0.1" value="1.1" oninput="document.getElementById('val-brilho').textContent=this.value"/></div>
-        <div class="slider-wrap"><label>Contraste <span id="val-contraste">1.2</span></label><input type="range" id="sl-contraste" min="0.5" max="2" step="0.1" value="1.2" oninput="document.getElementById('val-contraste').textContent=this.value"/></div>
-        <div class="slider-wrap"><label>Saturação <span id="val-cor">1.1</span></label><input type="range" id="sl-cor" min="0.5" max="2" step="0.1" value="1.1" oninput="document.getElementById('val-cor').textContent=this.value"/></div>
-        <button class="btn-primary" onclick="processarImagem('melhorar')">Melhorar</button>
-        <div class="ctrl-secao">🔍 Aumentar resolução</div>
-        <div class="ctrl-linha"><label><input type="radio" name="escala" value="2" checked/> 2x</label><label><input type="radio" name="escala" value="3"/> 3x</label><label><input type="radio" name="escala" value="4"/> 4x</label></div>
-        <button class="btn-primary" onclick="processarImagem('aumentar')">Aumentar</button>
-        <div class="ctrl-secao">📱 Otimizar Instagram</div>
-        <select id="formato-instagram"><option>Feed quadrado (1:1)</option><option>Feed retrato (4:5)</option><option>Feed paisagem (1.91:1)</option><option>Stories (9:16)</option><option>Reels (9:16)</option></select>
-        <button class="btn-primary" onclick="processarImagem('instagram')">Otimizar</button>
-        <div id="imagens-instrucao-wrap"><textarea id="imagens-instrucao" placeholder="Descreva como quer editar a foto..." rows="2"></textarea><button class="btn-primary" onclick="aplicarEdicaoTexto()">✨ Aplicar edição</button></div>
+    <div id="modal-tarefa" class="modal" style="display: none">
+      <div class="modal-box">
+        <h3>Nova Tarefa</h3>
+        <input type="text" id="tarefa-titulo" placeholder="Título" /><input
+          type="text"
+          id="tarefa-desc"
+          placeholder="Descrição (opcional)"
+        /><input type="date" id="tarefa-prazo" />
+        <div class="radio-group">
+          <label><input type="radio" name="prio" value="alta" /> Alta</label
+          ><label
+            ><input type="radio" name="prio" value="media" checked />
+            Média</label
+          ><label><input type="radio" name="prio" value="baixa" /> Baixa</label>
+        </div>
+        <div class="modal-btns">
+          <button class="btn-secondary" onclick="fecharModal('modal-tarefa')">
+            Cancelar</button
+          ><button class="btn-primary" onclick="criarTarefa()">Criar</button>
+        </div>
       </div>
     </div>
-  </section>
-</main>
 
-<div id="toast-container"></div>
-
-<div id="context-menu">
-  <div class="ctx-item" onclick="ctxCopy()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar</div>
-  <div class="ctx-item" onclick="ctxRegenerate()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Regenerar</div>
-  <div class="ctx-separator"></div>
-  <div class="ctx-item danger" onclick="ctxDelete()"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Deletar</div>
-</div>
-
-<div class="shortcut-hint" id="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> nova conversa &nbsp;·&nbsp; <kbd>Ctrl</kbd>+<kbd>B</kbd> esconder lateral</div>
-
-<div id="modal-config" class="modal" style="display:none">
-  <div class="modal-box modal-lg">
-    <h3>Configurações</h3>
-    <div class="modal-section">
-      <div class="modal-section-label">Chat no computador · Ollama</div>
-      <label><input type="checkbox" id="local-chat-enabled"/> Usar Ollama local nas respostas</label>
-      <label for="local-chat-model">Modelo instalado</label>
-      <input type="text" id="local-chat-model" list="local-chat-models" placeholder="Em branco usa o primeiro modelo instalado"/>
-      <datalist id="local-chat-models"></datalist>
-      <button class="btn-secondary" onclick="refreshLocalModels()">Buscar modelos no computador</button>
-      <p class="modal-row-desc" id="local-chat-status">Ollama deve estar aberto. Não precisa de chave. Salve no rodapé para aplicar.</p>
+    <div id="modal-lembrete" class="modal" style="display: none">
+      <div class="modal-box">
+        <h3>Novo Lembrete</h3>
+        <input type="text" id="lembrete-titulo" placeholder="Título" /><input
+          type="datetime-local"
+          id="lembrete-data"
+        />
+        <div class="radio-group">
+          <label
+            ><input type="radio" name="rep" value="nunca" checked />
+            Nunca</label
+          ><label><input type="radio" name="rep" value="diario" /> Diário</label
+          ><label
+            ><input type="radio" name="rep" value="semanal" /> Semanal</label
+          >
+        </div>
+        <div class="modal-btns">
+          <button class="btn-secondary" onclick="fecharModal('modal-lembrete')">
+            Cancelar</button
+          ><button class="btn-primary" onclick="criarLembrete()">Criar</button>
+        </div>
+      </div>
     </div>
-    <div class="modal-section">
-      <div class="modal-section-label">Gemini · usado quando o chat local está desligado</div>
-      <input type="password" id="input-key" placeholder="Cole sua Gemini API key..."/>
-      <div class="modal-row"><div><div class="modal-row-label">API Key configurada</div><div class="modal-row-desc" id="key-status">Verificando...</div></div><div class="key-dot" id="key-dot-modal"></div></div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-label">APIs adicionais</div>
-      <p class="modal-row-desc">Cadastre serviços de respostas, imagens e vídeos para usar depois. O cadastro não ativa o serviço: cada provedor ainda precisa ser integrado à NOVA.</p>
-      <div id="integration-list" aria-live="polite"></div>
-      <input type="hidden" id="integration-id"/>
-      <label for="integration-category">Finalidade</label>
-      <select id="integration-category"><option value="respostas">Respostas</option><option value="imagens">Imagens</option><option value="videos">Vídeos</option></select>
-      <label for="integration-name">Nome do serviço</label>
-      <input type="text" id="integration-name" maxlength="120" placeholder="Nome para identificar a API"/>
-      <label for="integration-url">Endereço da API (opcional)</label>
-      <input type="text" id="integration-url" placeholder="https://..."/>
-      <label for="integration-model">Modelo (opcional)</label>
-      <input type="text" id="integration-model" placeholder="Identificador do modelo"/>
-      <label for="integration-key">Chave da API</label>
-      <input type="password" id="integration-key" autocomplete="new-password" placeholder="Em branco mantém a chave salva"/>
-      <label><input type="checkbox" id="integration-clear-key"/> Remover a chave salva</label>
-      <p class="modal-row-desc">As chaves ficam em um arquivo local neste computador. Não compartilhe a pasta de dados.</p>
-      <div class="modal-btns"><button class="btn-secondary" onclick="resetIntegration()">Novo cadastro</button><button class="btn-primary" id="integration-save" onclick="saveIntegration()">Salvar API</button></div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-label">Dashboard</div>
-      <input type="text" id="input-cidade" placeholder="Cidade do clima" value="Rio de Janeiro"/>
-      <div class="modal-row-desc">Cidade usada na previsão do tempo.</div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-label">Tema</div>
-      <div class="theme-options"><div class="theme-option" data-theme="light" onclick="setTheme('light')">☀️ Claro</div><div class="theme-option" data-theme="dark" onclick="setTheme('dark')">🌙 Escuro</div></div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-label">Aparência</div>
-      <div class="modal-row"><div><div class="modal-row-label">Partículas cósmicas no chat</div><div class="modal-row-desc">Estrelinhas flutuando no fundo</div></div><div class="toggle on" id="toggle-particles" onclick="toggleSetting('particles', this)"></div></div>
-      <div class="modal-row"><div><div class="modal-row-label">Animações</div><div class="modal-row-desc">Transições e efeitos visuais</div></div><div class="toggle on" id="toggle-animations" onclick="toggleSetting('animations', this)"></div></div>
-    </div>
-    <div class="modal-btns"><button class="btn-secondary" onclick="fecharModal('modal-config')">Fechar</button><button class="btn-primary" onclick="salvarConfig()">Salvar</button></div>
-  </div>
-</div>
 
-<div id="modal-tarefa" class="modal" style="display:none">
-  <div class="modal-box"><h3>Nova Tarefa</h3><input type="text" id="tarefa-titulo" placeholder="Título"/><input type="text" id="tarefa-desc" placeholder="Descrição (opcional)"/><input type="date" id="tarefa-prazo"/><div class="radio-group"><label><input type="radio" name="prio" value="alta"/> 🔴 Alta</label><label><input type="radio" name="prio" value="media" checked/> 🟡 Média</label><label><input type="radio" name="prio" value="baixa"/> 🟢 Baixa</label></div><div class="modal-btns"><button class="btn-secondary" onclick="fecharModal('modal-tarefa')">Cancelar</button><button class="btn-primary" onclick="criarTarefa()">Criar</button></div></div>
-</div>
+    <div id="modal-habito" class="modal" style="display: none">
+      <div class="modal-box">
+        <h3>Novo Hábito</h3>
+        <input type="text" id="habito-nome" placeholder="Nome do hábito" />
+        <div class="ctrl-linha">
+          <input
+            type="text"
+            id="habito-icone"
+            placeholder="Ícone"
+            value="H"
+            style="width: 60px"
+          /><input type="color" id="habito-cor" value="#7c6fff" />
+        </div>
+        <div class="modal-btns">
+          <button class="btn-secondary" onclick="fecharModal('modal-habito')">
+            Cancelar</button
+          ><button class="btn-primary" onclick="criarHabito()">Criar</button>
+        </div>
+      </div>
+    </div>
 
-<div id="modal-lembrete" class="modal" style="display:none">
-  <div class="modal-box"><h3>Novo Lembrete</h3><input type="text" id="lembrete-titulo" placeholder="Título"/><input type="datetime-local" id="lembrete-data"/><div class="radio-group"><label><input type="radio" name="rep" value="nunca" checked/> Nunca</label><label><input type="radio" name="rep" value="diario"/> Diário</label><label><input type="radio" name="rep" value="semanal"/> Semanal</label></div><div class="modal-btns"><button class="btn-secondary" onclick="fecharModal('modal-lembrete')">Cancelar</button><button class="btn-primary" onclick="criarLembrete()">Criar</button></div></div>
-</div>
-
-<div id="modal-habito" class="modal" style="display:none">
-  <div class="modal-box"><h3>Novo Hábito</h3><input type="text" id="habito-nome" placeholder="Nome do hábito"/><div class="ctrl-linha"><input type="text" id="habito-icone" placeholder="Ícone" value="⭐" style="width:60px"/><input type="color" id="habito-cor" value="#7c6fff"/></div><div class="modal-btns"><button class="btn-secondary" onclick="fecharModal('modal-habito')">Cancelar</button><button class="btn-primary" onclick="criarHabito()">Criar</button></div></div>
-</div>
-
-<script src="app.js?v=20261017-solar"></script>
-<script src="integrations.js?v=1"></script>
-<script src="nova-presence.js?v=2"></script>
-<script src="solar.js?v=1"></script>
-</body>
+    <script src="app.js?v=20261017-solar"></script>
+    <script src="integrations.js?v=1"></script>
+    <script src="nova-presence.js?v=2"></script>
+    <script src="solar.js?v=1"></script>
+  </body>
 </html>

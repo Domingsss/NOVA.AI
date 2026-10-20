@@ -8,14 +8,14 @@ pacote = None
 try:
     from ddgs import DDGS
     pacote = "ddgs (novo)"
-    print(f"✅ Pacote novo 'ddgs' disponível")
+    print(f" Pacote novo 'ddgs' disponível")
 except ImportError:
     try:
         from duckduckgo_search import DDGS
         pacote = "duckduckgo_search (antigo)"
-        print(f"⚠️ Só o pacote antigo 'duckduckgo_search' disponível")
+        print(f" Só o pacote antigo 'duckduckgo_search' disponível")
     except ImportError:
-        print("❌ NENHUM pacote instalado!")
+        print(" NENHUM pacote instalado!")
         sys.exit(1)
 
 print(f"\n=== Teste 2: busca (pacote: {pacote}) ===")
@@ -36,7 +36,7 @@ try:
             print(f"  Query '{q}': ERRO - {e}")
             
 except Exception as e:
-    print(f"❌ Erro ao criar DDGS: {e}")
+    print(f" Erro ao criar DDGS: {e}")
     import traceback
     traceback.print_exc()
 
@@ -52,4 +52,4 @@ try:
     else:
         print("Lista vazia")
 except Exception as e:
-    print(f"❌ {e}")
+    print(f" {e}")

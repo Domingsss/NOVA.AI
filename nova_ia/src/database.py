@@ -15,7 +15,7 @@ def conectar():
 def inicializar():
     with conectar() as con:
 
-        # ── Conversas ─────────────────────────────────────────────────────────
+        # conversas
         con.execute("""
             CREATE TABLE IF NOT EXISTS conversas (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +26,7 @@ def inicializar():
             )
         """)
 
-        # ── Sessões de conversa ────────────────────────────────────────────────
+        # sessões de conversa
         con.execute("""
             CREATE TABLE IF NOT EXISTS sessoes (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +35,7 @@ def inicializar():
             )
         """)
 
-        # ── Projetos ──────────────────────────────────────────────────────────
+        # projetos
         con.execute("""
             CREATE TABLE IF NOT EXISTS projetos (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +45,7 @@ def inicializar():
             )
         """)
 
-        # ── Tarefas ───────────────────────────────────────────────────────────
+        # tarefas
         con.execute("""
             CREATE TABLE IF NOT EXISTS tarefas (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +60,7 @@ def inicializar():
             )
         """)
 
-        # ── Lembretes ─────────────────────────────────────────────────────────
+        # lembretes
         con.execute("""
             CREATE TABLE IF NOT EXISTS lembretes (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +74,7 @@ def inicializar():
             )
         """)
 
-        # ── Sessões de foco ───────────────────────────────────────────────────
+        # sessões de foco
         con.execute("""
             CREATE TABLE IF NOT EXISTS sessoes_foco (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,19 +85,19 @@ def inicializar():
             )
         """)
 
-        # ── Hábitos ───────────────────────────────────────────────────────────
+        # hábitos
         con.execute("""
             CREATE TABLE IF NOT EXISTS habitos (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 nome      TEXT NOT NULL,
-                icone     TEXT NOT NULL DEFAULT '⭐',
+                icone     TEXT NOT NULL DEFAULT '',
                 cor       TEXT NOT NULL DEFAULT '#7c6fff',
                 ativo     INTEGER NOT NULL DEFAULT 1,
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # ── Registros de hábitos ──────────────────────────────────────────────
+        # registros de hábitos
         con.execute("""
             CREATE TABLE IF NOT EXISTS registros_habitos (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,9 +107,9 @@ def inicializar():
             )
         """)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CONVERSAS
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# conversas
+
 
 def criar_sessao(titulo: str = "Nova conversa") -> int:
     with conectar() as con:
@@ -157,9 +157,9 @@ def limpar_historico(sessao_id: int):
     with conectar() as con:
         con.execute("DELETE FROM conversas WHERE sessao_id = ?", (sessao_id,))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PROJETOS
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# projetos
+
 
 def criar_projeto(nome: str, cor: str = "#7c6fff") -> int:
     with conectar() as con:
@@ -183,9 +183,9 @@ def deletar_projeto(projeto_id: int):
     with conectar() as con:
         con.execute("DELETE FROM projetos WHERE id = ?", (projeto_id,))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# TAREFAS
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# tarefas
+
 
 def criar_tarefa(titulo: str, descricao: str = "", projeto_id: int = None,
                  prioridade: str = "media", prazo: str = None) -> int:
@@ -233,9 +233,9 @@ def deletar_tarefa(tarefa_id: int):
     with conectar() as con:
         con.execute("DELETE FROM tarefas WHERE id = ?", (tarefa_id,))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# LEMBRETES
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# lembretes
+
 
 def criar_lembrete(titulo: str, data_hora: str, descricao: str = "",
                    repetir: str = "nunca") -> int:
@@ -266,9 +266,9 @@ def deletar_lembrete(lembrete_id: int):
     with conectar() as con:
         con.execute("DELETE FROM lembretes WHERE id = ?", (lembrete_id,))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SESSÕES DE FOCO
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# sessões de foco
+
 
 def salvar_sessao_foco(duracao_min: int, pausa_min: int, concluido: bool):
     with conectar() as con:
@@ -286,11 +286,11 @@ def stats_foco_hoje() -> dict:
         """).fetchone()
     return {"sessoes": row[0] or 0, "minutos": row[1] or 0}
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# HÁBITOS
-# ═══════════════════════════════════════════════════════════════════════════════
 
-def criar_habito(nome: str, icone: str = "⭐", cor: str = "#7c6fff") -> int:
+# hábitos
+
+
+def criar_habito(nome: str, icone: str = "", cor: str = "#7c6fff") -> int:
     with conectar() as con:
         cur = con.execute(
             "INSERT INTO habitos (nome, icone, cor) VALUES (?, ?, ?)",
@@ -337,9 +337,9 @@ def deletar_habito(habito_id: int):
     with conectar() as con:
         con.execute("DELETE FROM habitos WHERE id = ?", (habito_id,))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# RESUMO MATINAL
-# ═══════════════════════════════════════════════════════════════════════════════
+
+# resumo matinal
+
 
 def resumo_matinal() -> dict:
     with conectar() as con:

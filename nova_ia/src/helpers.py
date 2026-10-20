@@ -38,7 +38,7 @@ def _parte_gemini(parte):
             raise ValueError("A imagem precisa estar em formato base64.")
         cabecalho, dados = url.split(",", 1)
         mime_type = cabecalho[5:].split(";", 1)[0] or "image/jpeg"
-        # Valida o base64 antes de enviá-lo e normaliza sua representação.
+        # valida o base64 antes de enviá-lo e normaliza sua representação.
         dados = base64.b64encode(base64.b64decode(dados, validate=True)).decode("ascii")
         return {"inlineData": {"mimeType": mime_type, "data": dados}}
 
@@ -59,7 +59,7 @@ def _preparar_conversa(historico: list, system_prompt: str = SYSTEM_PROMPT):
         role = mensagem.get("role", "user")
         conteudo = mensagem.get("content", "")
 
-        # O Gemini recebe instruções de sistema separadamente do histórico.
+        # o Gemini recebe instruções de sistema separadamente do histórico.
         if role == "system":
             if isinstance(conteudo, str) and conteudo.strip():
                 instrucoes.append(conteudo)
@@ -108,7 +108,7 @@ def _requisicao_resiliente(api_key: str, sufixo: str, payload: dict):
     """Repete erros transitórios e troca para o Flash-Lite se faltar capacidade."""
     ultimo_erro = None
     for indice_modelo, model in enumerate(dict.fromkeys((MODEL, FALLBACK_MODEL))):
-        # Não prende a interface insistindo num modelo sabidamente congestionado.
+        # não prende a interface insistindo num modelo sabidamente congestionado.
         total_tentativas = 1 if indice_modelo == 0 else 3
         if indice_modelo > 0:
             print(f"[NOVA] Gemini principal indisponível; usando {model}.")
@@ -119,7 +119,7 @@ def _requisicao_resiliente(api_key: str, sufixo: str, payload: dict):
                 ultimo_erro = erro
                 if erro.code not in (408, 429, 500, 502, 503, 504):
                     raise
-                # 1s, 2s e um pequeno jitter para evitar nova colisão de tráfego.
+                # 1s, 2s e um pequeno jitter pra evitar nova colisão de tráfego.
                 if tentativa < total_tentativas - 1:
                     time.sleep((2 ** tentativa) + random.uniform(0.1, 0.5))
             except urllib.error.URLError as erro:
@@ -166,7 +166,7 @@ def chamar_gemini_multimodal(api_key: str, historico: list, max_tokens: int = 51
                     return _texto_resposta(json.load(resposta))
             except urllib.error.HTTPError as erro:
                 ultimo_erro = erro
-                # Modelo pode não aceitar áudio — tenta o próximo.
+                # modelo pode não aceitar áudio, tenta o próximo.
                 if erro.code == 400:
                     break
                 if erro.code not in (408, 429, 500, 502, 503, 504):
@@ -235,7 +235,7 @@ def chamar_gemini_simples(system_prompt: str, mensagem: str) -> str:
     api_key = carregar_key()
     historico = [{"role": "user", "content": mensagem}]
     try:
-        # Classificações internas priorizam latência e usam diretamente o Lite.
+        # classificações internas priorizam latência e usam diretamente o Lite.
         with _requisicao(api_key, "generateContent", _payload(historico, system_prompt, 300), FALLBACK_MODEL) as resposta:
             return _texto_resposta(json.load(resposta))
     except urllib.error.HTTPError as erro:
