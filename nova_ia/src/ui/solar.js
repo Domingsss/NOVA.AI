@@ -65,7 +65,7 @@
   solar.innerHTML = `<header class="solar-header"><div><h1>Sistema NOVA</h1><p>Seis mundos. Tudo conectado a você.</p></div><button type="button" id="solar-back">← Conversar com a NOVA</button></header>
     <div class="solar-map"><svg class="solar-orbits" viewBox="0 0 1000 620" preserveAspectRatio="none" aria-hidden="true"><ellipse cx="500" cy="310" rx="340" ry="235"/><ellipse cx="500" cy="310" rx="200" ry="150"/><path d="M500 310L170 105M500 310L830 105M500 310L170 310M500 310L830 310M500 310L170 515M500 310L830 515"/></svg><div id="solar-core"><span class="solar-core-label">NOVA · NÚCLEO</span></div>
     ${agents.map((a, i) => `<button type="button" class="planet-node planet-${a.id}" data-agent="${a.id}" style="--planet:${a.color};--delay:${i * 65}ms" aria-haspopup="dialog"><span class="planet-sphere" aria-hidden="true"></span><span class="planet-text"><strong>${a.name}</strong><span class="planet-summary">${a.note}</span><span class="planet-open">Explorar </span></span></button>`).join("")}</div><p class="solar-footer">Selecione um mundo para ver seus dados e conversar com seu agente.</p>
-    <dialog id="planet-dialog" aria-labelledby="planet-title"><header><div><h2 id="planet-title"></h2></div><button type="button" id="planet-close" aria-label="Fechar detalhes">✕</button></header><p id="planet-description"></p><div id="planet-data"></div><form id="planet-form"><label for="planet-question">Converse com este agente</label><div><input id="planet-question" maxlength="2000" required placeholder="O que você quer saber?" autocomplete="off"/><button type="submit">Perguntar </button></div></form><div id="planet-answer" role="status" aria-live="polite"></div></dialog>`;
+    <dialog id="planet-dialog" aria-labelledby="planet-title" aria-describedby="planet-description"><header><div class="planet-identity"><span class="planet-avatar planet-sphere" aria-hidden="true"></span><div><span id="planet-area" class="planet-eyebrow"></span><h2 id="planet-title"></h2></div></div><button type="button" id="planet-close" aria-label="Fechar detalhes">✕</button></header><p id="planet-description"></p><div id="planet-data"></div><div id="planet-suggestions" aria-label="Sugestões de perguntas"></div><form id="planet-form"><label for="planet-question">Converse com <span id="planet-chat-name">este agente</span></label><div><input id="planet-question" maxlength="2000" required placeholder="O que você quer saber?" autocomplete="off"/><button type="submit">Enviar ↗</button></div></form><div id="planet-answer" role="status" aria-live="polite"></div></dialog>`;
   chat.before(solar);
   const core = document.getElementById("solar-core");
   const dialog = document.getElementById("planet-dialog");
@@ -152,8 +152,25 @@
       document.getElementById("planet-title").textContent = selected.name;
 
       document.getElementById("planet-description").textContent =
-        selected.note +
-        ". Um agente especializado da NOVA, com acesso aos dados desta área.";
+        selected.note + ". Explore seus dados com a ajuda da NOVA.";
+      document.getElementById("planet-area").textContent = "AGENTE NOVA / " + selected.area;
+      document.getElementById("planet-chat-name").textContent = selected.name;
+      dialog.dataset.agent = selected.id;
+      const suggestions = document.getElementById("planet-suggestions");
+      suggestions.replaceChildren();
+      if (selected.id === "terra") {
+        ["Vou precisar de guarda-chuva?", "Como está a sensação térmica?", "O que vestir hoje?"].forEach((question) => {
+          const suggestion = document.createElement("button");
+          suggestion.type = "button";
+          suggestion.textContent = question;
+          suggestion.addEventListener("click", () => {
+            const input = document.getElementById("planet-question");
+            input.value = question;
+            input.focus();
+          });
+          suggestions.append(suggestion);
+        });
+      }
       dialog.style.setProperty("--planet", selected.color);
       document.getElementById("planet-answer").textContent = "";
       document.getElementById("planet-question").value = "";

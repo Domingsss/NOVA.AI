@@ -4,7 +4,6 @@ let focoSegundos = 0;
 let focoTotalSegundos = 0;
 let focoFase = "foco";
 let focoPausado = false;
-let imagemAtual = null;
 let settings = { particles: true, animations: true, theme: "light" };
 let ultimaMsgNova = null;
 let contextMsgEl = null;
@@ -12,19 +11,8 @@ let cidadeDashboard = "Rio de Janeiro";
 let gravadorVoz = null;
 let gravandoVoz = false;
 let vozNovaAtiva = true;
-let vozesTTS = [];
 let modoGravacaoVoz = "native";
 let timerGravacaoVoz = null;
-
-function carregarVozesTTS() {
-  if (!("speechSynthesis" in window)) return;
-  const vozes = speechSynthesis.getVoices();
-  if (vozes.length) vozesTTS = vozes;
-}
-if ("speechSynthesis" in window) {
-  carregarVozesTTS();
-  speechSynthesis.addEventListener("voiceschanged", carregarVozesTTS);
-}
 
 function storageGet(chave, fallback = null) {
   try {
@@ -53,8 +41,8 @@ function atualizarControlesVoz() {
 }
 function toggleVozNova() {
   vozNovaAtiva = !vozNovaAtiva;
+  if (!vozNovaAtiva) pararVozLocal();
   storageSet("novaVozAtiva", vozNovaAtiva ? "1" : "0");
-  if (!vozNovaAtiva && "speechSynthesis" in window) speechSynthesis.cancel();
   atualizarControlesVoz();
   showToast(
     vozNovaAtiva ? "Voz da NOVA ativada" : "Voz da NOVA silenciada",
@@ -63,27 +51,29 @@ function toggleVozNova() {
     1800,
   );
 }
-function falarResposta(texto) {
-  if (!vozNovaAtiva || !("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
+let audioLocal = null;
+let falaTicket = 0;
+function pararVozLocal() {
+  falaTicket++;
+  if (audioLocal) { audioLocal.pause(); audioLocal = null; }
+}
+async function falarResposta(texto) {
+  pararVozLocal();
+  if (!vozNovaAtiva || !texto) return;
+  const ticket = falaTicket;
   const tmp = document.createElement("div");
   tmp.innerHTML = renderMarkdown(texto);
-  const fala = new SpeechSynthesisUtterance(
-    tmp.textContent.replace(/\s+/g, " ").trim(),
-  );
-  fala.lang = "pt-BR";
-  fala.rate = 1.04;
-  fala.pitch = 0.96;
-  const vozes = vozesTTS.length ? vozesTTS : speechSynthesis.getVoices();
-  fala.voice =
-    vozes.find(
-      (v) =>
-        v.lang?.toLowerCase() === "pt-br" &&
-        /female|francisca|maria|leticia/i.test(v.name),
-    ) ||
-    vozes.find((v) => v.lang?.toLowerCase().startsWith("pt")) ||
-    null;
-  speechSynthesis.speak(fala);
+  const plain = tmp.textContent.replace(/\s+/g, " ").trim().slice(0, 6000);
+  if (!plain) return;
+  try {
+    const result = await chamarAPI("sintetizar_voz", plain);
+    if (ticket !== falaTicket || !vozNovaAtiva) return;
+    if (!result.ok) throw new Error(result.erro);
+    audioLocal = new Audio(result.data.audio);
+    await audioLocal.play();
+  } catch (error) {
+    if (ticket === falaTicket) showToast("Voz local indisponível", error.message, "error");
+  }
 }
 function criarWav(amostras, sampleRate) {
   const total = amostras.reduce((n, a) => n + a.length, 0),
@@ -124,7 +114,7 @@ async function toggleGravacao() {
   return iniciarGravacaoComFallback();
 }
 async function iniciarGravacaoComFallback() {
-  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  pararVozLocal();
   if (!sessaoAtual) await novaConversa();
   const r = await chamarAPI("iniciar_gravacao_nativa");
   if (r.ok) return iniciarGravacaoNativaPos(r.data?.backend || "native");
@@ -201,7 +191,7 @@ async function iniciarGravacao() {
   }
   if (!sessaoAtual) await novaConversa();
   try {
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    pararVozLocal();
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -669,12 +659,14 @@ function formatarUptime(segundos) {
   return `${d ? d + "d " : ""}${h}h ${m}m`;
 }
 function iconeClima(codigo) {
-  if (codigo === 0) return "Sol";
-  if (codigo <= 3) return "Nuvens";
-  if (codigo <= 48) return "Névoa";
-  if (codigo >= 95) return "Trovoada";
-  if (codigo >= 71 && codigo <= 75) return "Neve";
-  return "Chuva";
+  const cloud = '<path d="M7 17a4 4 0 1 1 .6-7.95A6 6 0 0 1 19 11a3 3 0 0 1 0 6Z"/>';
+  let drawing = cloud;
+  if (codigo === 0) drawing = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>';
+  else if (codigo >= 95) drawing += '<path d="m13 16-3 4h4l-2 3"/>';
+  else if ((codigo >= 71 && codigo <= 77) || codigo === 85 || codigo === 86) drawing += '<path d="M8 20v2m-1-1h2m7-1v2m-1-1h2"/>';
+  else if (codigo === 45 || codigo === 48) drawing += '<path d="M4 20h16M7 23h10"/>';
+  else if (codigo > 3) drawing += '<path d="m8 20-1 2m6-2-1 2m6-2-1 2"/>';
+  return `<svg viewBox="0 0 24 26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${drawing}</svg>`;
 }
 function moeda(valor) {
   return valor == null
@@ -1039,6 +1031,7 @@ function hideProgressBar() {
   document.getElementById("chat-progress-bar").classList.remove("active");
 }
 async function enviarMensagem() {
+  if (document.getElementById("chat-send").disabled) return;
   const input = document.getElementById("chat-input");
   const texto = input.value.trim();
   const img = imagemChatB64;
@@ -1061,14 +1054,12 @@ async function enviarMensagem() {
   showProgressBar();
   if (img) {
     adicionarTyping();
-    const r = await chamarAPI("chat_imagem", sessaoAtual, texto, img);
+    const r = await chamarAPI("enviar_mensagem", sessaoAtual, texto, img);
     removerTyping();
     btn.disabled = false;
     hideProgressBar();
     if (r.ok) {
-      if (r.data.tipo === "imagem")
-        adicionarMensagemImagem(r.data.resposta, r.data.imagem_base64);
-      else adicionarMensagem("nova", r.data.resposta);
+      adicionarMensagem("nova", r.data.resposta);
       await carregarSessoes();
       marcarSessaoAtiva(sessaoAtual);
     } else {
@@ -1135,7 +1126,7 @@ window.__novaErro = function (msg) {
     window.__novaPrimeiroChunk();
   const b = document.getElementById("streaming-bubble");
   if (!b) return;
-  b.removeAttribute("id");
+  // O retorno da API finaliza esta bolha; manter o ID evita duplicar o erro.
   b.textContent = ` ${msg}`;
   showToast("Erro", msg, "error");
 };
@@ -1465,80 +1456,19 @@ function atualizarTimerDisplay(s) {
   document.getElementById("foco-timer").textContent =
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
-async function selecionarImagem() {
-  const r = await chamarAPI("abrir_arquivo_dialogo");
-  if (!r.ok || !r.data) return;
-  imagemAtual = r.data.caminho;
-  const p = document.getElementById("imagens-preview");
-  const ph = document.getElementById("imagens-placeholder");
-  p.src = r.data.base64;
-  p.style.display = "block";
-  ph.style.display = "none";
-  document.getElementById("imagens-info").textContent =
-    `${r.data.largura}×${r.data.altura}px • ${r.data.nome}`;
-  document.getElementById("imagens-status").textContent = "";
-}
-async function processarImagem(op) {
-  if (!imagemAtual) {
-    document.getElementById("imagens-status").textContent =
-      " Selecione primeiro";
-    return;
-  }
-  document.getElementById("imagens-status").textContent = " Processando...";
-  let p = {};
-  if (op === "melhorar")
-    p = {
-      nitidez: parseFloat(document.getElementById("sl-nitidez").value),
-      brilho: parseFloat(document.getElementById("sl-brilho").value),
-      contraste: parseFloat(document.getElementById("sl-contraste").value),
-      cor: parseFloat(document.getElementById("sl-cor").value),
-    };
-  else if (op === "aumentar")
-    p = {
-      escala: parseInt(
-        document.querySelector('input[name="escala"]:checked').value,
-      ),
-    };
-  else if (op === "instagram")
-    p = { formato: document.getElementById("formato-instagram").value };
-  else if (op === "trocar_fundo")
-    p = {
-      cor: [
-        parseInt(document.getElementById("cor-fundo").value.slice(1, 3), 16),
-        parseInt(document.getElementById("cor-fundo").value.slice(3, 5), 16),
-        parseInt(document.getElementById("cor-fundo").value.slice(5, 7), 16),
-      ],
-    };
-  const r = await chamarAPI("processar_imagem", imagemAtual, op, p);
-  if (r.ok) {
-    document.getElementById("imagens-preview").src = r.data.base64;
-    document.getElementById("imagens-preview").style.display = "block";
-    document.getElementById("imagens-placeholder").style.display = "none";
-    document.getElementById("imagens-status").textContent =
-      ` ${r.data.caminho.split("\\").pop()}`;
-    showToast("Processado!", r.data.operacao, "success", 2200);
-  } else {
-    document.getElementById("imagens-status").textContent = ` ${r.erro}`;
-    showToast("Erro", r.erro, "error");
-  }
-}
-async function aplicarEdicaoTexto() {
-  if (!imagemAtual) return;
-  const ins = document.getElementById("imagens-instrucao").value.trim();
-  if (!ins) return;
-  document.getElementById("imagens-status").textContent = " Entendendo...";
-  const r = await chamarAPI("interpretar_e_processar_imagem", imagemAtual, ins);
-  if (r.ok) {
-    document.getElementById("imagens-preview").src = r.data.base64;
-    document.getElementById("imagens-preview").style.display = "block";
-    document.getElementById("imagens-placeholder").style.display = "none";
-    document.getElementById("imagens-status").textContent =
-      ` ${r.data.operacao}`;
-  } else document.getElementById("imagens-status").textContent = ` ${r.erro}`;
-}
 function fecharModal(id) {
   document.getElementById(id).style.display = "none";
 }
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("modal")) e.target.style.display = "none";
 });
+async function verificarModelosLocais() {
+  const status = document.getElementById("local-media-status");
+  status.textContent = "Verificando…";
+  try {
+    const result = await chamarAPI("status_modelos_locais");
+    if (!result.ok) throw new Error(result.erro);
+    status.textContent = Object.entries({transcricao: "Transcrição", voz: "Voz"})
+      .map(([key, label]) => label + ": " + (result.data[key] ? "arquivos encontrados" : "instalação pendente")).join(" · ");
+  } catch (error) { status.textContent = error.message; }
+}

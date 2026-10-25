@@ -428,3 +428,63 @@ body.nova-immersive #app-topbar {
     transition: none;
   }
 }
+/* Agent detail: clear hierarchy, restrained color and comfortable reading. */
+#planet-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 30px;
+  background: radial-gradient(ellipse at top left, color-mix(in srgb, var(--planet) 7%, transparent), transparent 55%), var(--surface);
+  border-color: color-mix(in srgb, var(--planet) 20%, var(--border));
+}
+.planet-identity { display: flex; align-items: center; gap: 16px; }
+#planet-dialog .planet-avatar { width: 48px; }
+#planet-dialog[data-agent="terra"] .planet-avatar {
+  background: radial-gradient(ellipse at 32% 35%, #8cd6b5 0 17%, transparent 19%), radial-gradient(ellipse at 65% 65%, #438b84 0 22%, transparent 24%), radial-gradient(circle at 30% 30%, #8dddf0, #244361 55%, #0d1221 90%);
+}
+.planet-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 1.8px; text-transform: uppercase; }
+#planet-title { margin: 4px 0 0; font-size: 28px; font-weight: 500; letter-spacing: -.8px; }
+#planet-close { width: 40px; height: 40px; padding: 0; flex-shrink: 0; }
+#planet-description { margin: 20px 0 24px; font-size: 13px; color: var(--text); opacity: .72; }
+#planet-data .dash-weather {
+  min-height: 0;
+  padding: 24px;
+  background: color-mix(in srgb, var(--planet) 5%, var(--surface));
+  border-color: color-mix(in srgb, var(--planet) 16%, var(--border));
+  border-radius: 18px;
+}
+#planet-data .dash-card-label { color: var(--planet); font-size: 10px; letter-spacing: 1.8px; }
+.dash-weather .weather-icon svg { display: block; width: 1em; height: 1em; }
+#planet-data .weather-main { grid-template-columns: auto 1fr auto; gap: 16px; padding: 26px 0; }
+#planet-data .weather-icon { grid-column: 3; grid-row: 1; font-size: 64px; color: var(--planet); filter: none; }
+#planet-data .weather-main > strong { grid-column: 1; grid-row: 1; color: var(--text); font-size: 72px; font-weight: 500; letter-spacing: -4px; }
+#planet-data .weather-main div { grid-column: 2; grid-row: 1; min-width: 0; }
+#planet-data .weather-main div b { font-size: 16px; color: var(--text); overflow-wrap: anywhere; }
+#planet-data .weather-main div small { font-size: 13px; color: var(--text); opacity: .7; }
+#planet-data .weather-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; border-top-color: var(--border); padding-top: 18px; }
+#planet-data .weather-stats span { padding: 12px; font-size: 10px; color: var(--text); background: var(--surface); border-color: var(--border); border-radius: 10px; }
+#planet-data .weather-stats b { font-size: 17px; font-weight: 600; color: var(--text); }
+#planet-data .dash-source { font-size: 10px; color: var(--text); opacity: .6; margin-top: 16px; }
+#planet-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+#planet-suggestions:empty { display: none; }
+#planet-suggestions button { padding: 9px 12px; border: 1px solid var(--border); border-radius: 20px; color: var(--text); background: transparent; font: 11px var(--font); cursor: pointer; }
+#planet-suggestions button:hover, #planet-close:hover { border-color: var(--planet); background: color-mix(in srgb, var(--planet) 9%, var(--surface)); }
+#planet-form { margin-top: 22px; }
+#planet-form label { font-size: 13px; font-weight: 500; }
+#planet-question { padding: 15px; border-radius: 12px; }
+#planet-form button { border-radius: 12px; background: #8560c4; font: 500 13px var(--font); padding-inline: 22px; }
+#planet-form button:hover:not(:disabled) { background: #9671d5; }
+#planet-dialog :is(button, input):focus-visible { outline: 2px solid var(--planet); outline-offset: 3px; }
+#planet-answer:empty { display: none; }
+#planet-answer:not(:empty) { padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+@media (max-width: 600px) {
+  #planet-dialog { padding: 20px; border-radius: 20px; }
+  #planet-data .dash-weather { padding: 18px; }
+  #planet-data .weather-main { grid-template-columns: auto 1fr; gap: 12px; padding: 22px 0; }
+  #planet-data .weather-main > strong { font-size: 60px; }
+  #planet-data .weather-icon { grid-column: 2; justify-self: end; font-size: 48px; }
+  #planet-data .weather-main div { grid-column: 1 / -1; grid-row: 2; }
+  #planet-data .weather-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #planet-form > div { flex-direction: row; }
+  #planet-form button { padding-inline: 15px; }
+  #planet-question { font-size: 16px; }
+}

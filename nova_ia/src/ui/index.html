@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="style.css?v=20261017-solar" />
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="solar.css?v=1" />
+    <link rel="stylesheet" href="solar.css?v=20261020" />
   </head>
   <body class="sidebar-collapsed">
     <div id="splash">
@@ -125,14 +125,6 @@
             <line x1="6" y1="20" x2="6" y2="14" />
           </svg>
           <span class="nav-label">Hábitos</span>
-        </button>
-        <button class="nav-btn" data-aba="imagens">
-          <svg class="nav-icon" viewBox="0 0 24 24">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-          <span class="nav-label">Imagens</span>
         </button>
       </nav>
 
@@ -542,154 +534,6 @@
         </div>
         <div id="lista-habitos"></div>
       </section>
-
-      <section id="aba-imagens" class="aba">
-        <div class="painel-header">
-          <div class="painel-titulo">
-            <div class="painel-icon-wrap">
-              <svg viewBox="0 0 24 24">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            </div>
-            <div class="painel-titulo-texto">
-              <h2>Imagens</h2>
-              <div class="painel-subtitle">Edite e otimize suas fotos</div>
-            </div>
-          </div>
-          <button
-            class="btn-secondary"
-            onclick="chamarAPI('abrir_pasta_editadas')"
-          >
-            Ver editadas
-          </button>
-        </div>
-        <div id="imagens-corpo">
-          <div id="imagens-preview-area">
-            <button class="btn-primary" onclick="selecionarImagem()">
-              <svg viewBox="0 0 24 24">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              Selecionar imagem
-            </button>
-            <div id="imagens-preview-wrap">
-              <img id="imagens-preview" src="" alt="" style="display: none" />
-              <p id="imagens-placeholder">Nenhuma imagem selecionada</p>
-            </div>
-            <p id="imagens-info"></p>
-            <p id="imagens-status"></p>
-          </div>
-          <div id="imagens-controles">
-            <div class="ctrl-secao">Remover fundo</div>
-            <button
-              class="btn-primary"
-              onclick="processarImagem('remover_fundo')"
-            >
-              Remover fundo
-            </button>
-            <div class="ctrl-secao">Trocar fundo por cor</div>
-            <div class="ctrl-linha">
-              <input type="color" id="cor-fundo" value="#ffffff" /><span
-                id="cor-fundo-label"
-                >#ffffff</span
-              >
-            </div>
-            <button
-              class="btn-primary"
-              onclick="processarImagem('trocar_fundo')"
-            >
-              Aplicar cor
-            </button>
-            <div class="ctrl-secao">Melhorar qualidade</div>
-            <div class="slider-wrap">
-              <label>Nitidez <span id="val-nitidez">2.0</span></label
-              ><input
-                type="range"
-                id="sl-nitidez"
-                min="1"
-                max="4"
-                step="0.1"
-                value="2"
-                oninput="document.getElementById('val-nitidez').textContent=this.value"
-              />
-            </div>
-            <div class="slider-wrap">
-              <label>Brilho <span id="val-brilho">1.1</span></label
-              ><input
-                type="range"
-                id="sl-brilho"
-                min="0.5"
-                max="2"
-                step="0.1"
-                value="1.1"
-                oninput="document.getElementById('val-brilho').textContent=this.value"
-              />
-            </div>
-            <div class="slider-wrap">
-              <label>Contraste <span id="val-contraste">1.2</span></label
-              ><input
-                type="range"
-                id="sl-contraste"
-                min="0.5"
-                max="2"
-                step="0.1"
-                value="1.2"
-                oninput="document.getElementById('val-contraste').textContent=this.value"
-              />
-            </div>
-            <div class="slider-wrap">
-              <label>Saturação <span id="val-cor">1.1</span></label
-              ><input
-                type="range"
-                id="sl-cor"
-                min="0.5"
-                max="2"
-                step="0.1"
-                value="1.1"
-                oninput="document.getElementById('val-cor').textContent=this.value"
-              />
-            </div>
-            <button class="btn-primary" onclick="processarImagem('melhorar')">
-              Melhorar
-            </button>
-            <div class="ctrl-secao">Aumentar resolução</div>
-            <div class="ctrl-linha">
-              <label
-                ><input type="radio" name="escala" value="2" checked />
-                2x</label
-              ><label><input type="radio" name="escala" value="3" /> 3x</label
-              ><label><input type="radio" name="escala" value="4" /> 4x</label>
-            </div>
-            <button class="btn-primary" onclick="processarImagem('aumentar')">
-              Aumentar
-            </button>
-            <div class="ctrl-secao">Otimizar Instagram</div>
-            <select id="formato-instagram">
-              <option>Feed quadrado (1:1)</option>
-              <option>Feed retrato (4:5)</option>
-              <option>Feed paisagem (1.91:1)</option>
-              <option>Stories (9:16)</option>
-              <option>Reels (9:16)</option>
-            </select>
-            <button class="btn-primary" onclick="processarImagem('instagram')">
-              Otimizar
-            </button>
-            <div id="imagens-instrucao-wrap">
-              <textarea
-                id="imagens-instrucao"
-                placeholder="Descreva como quer editar a foto..."
-                rows="2"
-              ></textarea
-              ><button class="btn-primary" onclick="aplicarEdicaoTexto()">
-                Aplicar edição
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
 
     <div id="toast-container"></div>
@@ -733,6 +577,12 @@
       <div class="modal-box modal-lg">
         <h3>Configurações</h3>
         <div class="modal-section">
+          <div class="modal-section-label">Voz no computador</div>
+          <p class="modal-row-desc">Whisper para ouvir e Piper para falar. Os modelos precisam estar instalados.</p>
+          <button class="btn-secondary" type="button" onclick="verificarModelosLocais()">Verificar instalação</button>
+          <p class="modal-row-desc" id="local-media-status" aria-live="polite"></p>
+        </div>
+        <div class="modal-section">
           <div class="modal-section-label">Chat no computador · Ollama</div>
           <label
             ><input type="checkbox" id="local-chat-enabled" /> Usar Ollama local
@@ -750,7 +600,7 @@
             Buscar modelos no computador
           </button>
           <p class="modal-row-desc" id="local-chat-status">
-            Ollama deve estar aberto. Não precisa de chave. Salve no rodapé para
+            A NOVA inicia o Ollama automaticamente. Não precisa de chave. Salve no rodapé para
             aplicar.
           </p>
         </div>
@@ -774,7 +624,7 @@
         <div class="modal-section">
           <div class="modal-section-label">APIs adicionais</div>
           <p class="modal-row-desc">
-            Cadastre serviços de respostas, imagens e vídeos para usar depois. O
+            Cadastre serviços de respostas e vídeos para usar depois. O
             cadastro não ativa o serviço: cada provedor ainda precisa ser
             integrado à NOVA.
           </p>
@@ -783,7 +633,6 @@
           <label for="integration-category">Finalidade</label>
           <select id="integration-category">
             <option value="respostas">Respostas</option>
-            <option value="imagens">Imagens</option>
             <option value="videos">Vídeos</option>
           </select>
           <label for="integration-name">Nome do serviço</label>
@@ -958,9 +807,9 @@
       </div>
     </div>
 
-    <script src="app.js?v=20261017-solar"></script>
+    <script src="app.js?v=20261020-local-chat-fix"></script>
     <script src="integrations.js?v=1"></script>
     <script src="nova-presence.js?v=2"></script>
-    <script src="solar.js?v=1"></script>
+    <script src="solar.js?v=20261020"></script>
   </body>
 </html>

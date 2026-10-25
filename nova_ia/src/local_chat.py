@@ -4,6 +4,7 @@ import urllib.error
 import urllib.request
 from integrations import DATA_DIR
 from config import SYSTEM_PROMPT
+from local_runtime import ensure_running
 
 SETTINGS = DATA_DIR / 'local_chat.json'
 URL = 'http://127.0.0.1:11434'
@@ -25,6 +26,7 @@ def configure(enabled, model):
 
 
 def request(path, payload=None):
+    ensure_running()
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(URL + path, data=data, headers={'Content-Type': 'application/json'})
     try:
@@ -32,7 +34,7 @@ def request(path, payload=None):
     except urllib.error.HTTPError as error:
         raise RuntimeError('Ollama recusou a solicitação. Confira o modelo instalado e o suporte a imagens.') from error
     except (urllib.error.URLError, TimeoutError) as error:
-        raise RuntimeError('Ollama local indisponível. Abra o Ollama no computador e tente novamente.') from error
+        raise RuntimeError('Ollama local indisponível. Tente novamente para reiniciar a conexão.') from error
 
 
 def models():
